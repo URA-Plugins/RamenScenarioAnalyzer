@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsUraPlugin>true</IsUraPlugin>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>2026.07.02</Version>
+
+    <PluginDisplayName>RamenScenarioAnalyzer</PluginDisplayName>
+    <PluginAuthor>UmamusumeResponseAnalyzer</PluginAuthor>
+    <PluginDescription>解析拉面杯回合训练信息</PluginDescription>
+    <PluginDependencies>EventLoggerPlugin</PluginDependencies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="RamenScenarioAnalyzerPatchDslSmoke" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EventLoggerPlugin\EventLoggerPlugin.csproj">
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>
