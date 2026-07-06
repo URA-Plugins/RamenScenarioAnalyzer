@@ -26,8 +26,7 @@ public sealed class RamenCommandInfo
     public RamenCommandInfo(RamenScenarioResponseData response, int commandId)
     {
         CommandId = commandId;
-        if (TurnInfoRamen.ToTrainIndex.TryGetValue(commandId, out var trainIndex))
-            TrainIndex = trainIndex + 1;
+        TrainIndex = TurnInfoRamen.ToTrainIndex[commandId] + 1;
         var baseCommandId = TurnInfoRamen.ToTrainId[CommandId];
 
         var homeInfo = response.HomeInfo ?? throw new InvalidOperationException("Ramen 训练显示需要 home_info。");

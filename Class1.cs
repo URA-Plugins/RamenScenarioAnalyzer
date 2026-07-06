@@ -205,7 +205,7 @@ public sealed class RamenScenarioAnalyzer : IPlugin
         var trainStats = RamenTrainingStatsCalculator.CreateTrainStats(turn);
         var context = new RamenTrainingDisplayContext(data.Response, data, turn, trainStats);
         var builder = RamenTrainingDisplayBuilder.CreateDefault(context);
-        AddBreedersCommonImportantRows(data, turn, builder);
+        AddTurnStateImportantRows(data, turn, builder);
 
         ApplyModifiers(context, builder);
 
@@ -232,7 +232,7 @@ public sealed class RamenScenarioAnalyzer : IPlugin
                 && baseTrainId == trainId));
     }
 
-    void AddBreedersCommonImportantRows(
+    void AddTurnStateImportantRows(
         RamenScenarioResponseData data,
         TurnInfoRamen turn,
         RamenTrainingDisplayBuilder builder)
