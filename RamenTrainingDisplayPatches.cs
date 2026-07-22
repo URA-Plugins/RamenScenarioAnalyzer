@@ -1,6 +1,3 @@
-using Spectre.Console;
-using Spectre.Console.Rendering;
-
 namespace RamenScenarioAnalyzer;
 
 public sealed class RamenTrainingDisplayPatch
@@ -52,20 +49,13 @@ public sealed class RamenTrainingCardPatch
     public RamenTrainingCardPatch AddDescription(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        operations.Add(new TrainingCardAddRow(selector, new Text(text)));
+        operations.Add(new TrainingCardAddRow(selector, text));
         return this;
     }
 
-    public RamenTrainingCardPatch AddMarkup(string markup)
+    public RamenTrainingCardPatch Highlight()
     {
-        ArgumentNullException.ThrowIfNull(markup);
-        operations.Add(new TrainingCardAddRow(selector, new Markup(markup)));
-        return this;
-    }
-
-    public RamenTrainingCardPatch Border(Color color)
-    {
-        operations.Add(new TrainingCardSetBorder(selector, color));
+        operations.Add(new TrainingCardHighlight(selector));
         return this;
     }
 
@@ -93,14 +83,7 @@ public sealed class RamenDisplayRowsPatch
     public RamenDisplayRowsPatch AddText(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        operations.Add(new RowsAddRenderable(target, new Text(text)));
-        return this;
-    }
-
-    public RamenDisplayRowsPatch AddMarkup(string markup)
-    {
-        ArgumentNullException.ThrowIfNull(markup);
-        operations.Add(new RowsAddRenderable(target, new Markup(markup)));
+        operations.Add(new RowsAddText(target, text));
         return this;
     }
 }
@@ -121,14 +104,7 @@ public sealed class RamenScenarioPanelPatch
     public RamenScenarioPanelPatch AddText(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        operations.Add(new ScenarioPanelAddRow(key, new Text(text)));
-        return this;
-    }
-
-    public RamenScenarioPanelPatch AddMarkup(string markup)
-    {
-        ArgumentNullException.ThrowIfNull(markup);
-        operations.Add(new ScenarioPanelAddRow(key, new Markup(markup)));
+        operations.Add(new ScenarioPanelAddRow(key, text));
         return this;
     }
 
@@ -164,18 +140,18 @@ sealed record TrainingByCommandId(int CommandId) : IRamenTrainingCardSelector
             ?? throw new InvalidOperationException($"拉面杯训练卡不存在: commandId={CommandId}");
 }
 
-sealed record TrainingCardAddRow(IRamenTrainingCardSelector Selector, IRenderable Row)
+sealed record TrainingCardAddRow(IRamenTrainingCardSelector Selector, string Row)
     : IRamenTrainingDisplayPatchOperation
 {
     public void Apply(RamenTrainingDisplayBuilder builder)
         => Selector.Select(builder).AddRow(Row);
 }
 
-sealed record TrainingCardSetBorder(IRamenTrainingCardSelector Selector, Color Color)
+sealed record TrainingCardHighlight(IRamenTrainingCardSelector Selector)
     : IRamenTrainingDisplayPatchOperation
 {
     public void Apply(RamenTrainingDisplayBuilder builder)
-        => Selector.Select(builder).BorderColor = Color;
+        => Selector.Select(builder).Highlighted = true;
 }
 
 sealed record TrainingCardSetTitle(IRamenTrainingCardSelector Selector, string Title)
@@ -191,7 +167,7 @@ enum RamenDisplayRowsTarget
     Extra
 }
 
-sealed record RowsAddRenderable(RamenDisplayRowsTarget Target, IRenderable Row)
+sealed record RowsAddText(RamenDisplayRowsTarget Target, string Row)
     : IRamenTrainingDisplayPatchOperation
 {
     public void Apply(RamenTrainingDisplayBuilder builder)
@@ -203,25 +179,14 @@ sealed record RowsAddRenderable(RamenDisplayRowsTarget Target, IRenderable Row)
     }
 }
 
-sealed record ScenarioPanelAddRow(string Key, IRenderable Row) : IRamenTrainingDisplayPatchOperation
+sealed record ScenarioPanelAddRow(string Key, string Row) : IRamenTrainingDisplayPatchOperation
 {
     public void Apply(RamenTrainingDisplayBuilder builder)
     {
         var panel = builder.FindScenarioPanel(Key)
             ?? throw new InvalidOperationException($"拉面杯剧本面板不存在: key={Key}");
 
-        panel.Content = AppendRow(panel.Content, Row);
-    }
-
-    static IRenderable AppendRow(IRenderable current, IRenderable row)
-    {
-        var table = new Table();
-        table.HideHeaders();
-        table.NoBorder();
-        table.AddColumn(string.Empty);
-        table.AddRow(current);
-        table.AddRow(row);
-        return table;
+        panel.Content = $"{panel.Content}{Environment.NewLine}{Row}";
     }
 }
 

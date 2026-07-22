@@ -10,7 +10,6 @@ Plugins that need to change the training display can reference this project and 
 
 ```csharp
 using RamenScenarioAnalyzer;
-using Spectre.Console;
 using UmamusumeResponseAnalyzer.Plugin;
 
 [assembly: SharedContextWith("RamenScenarioAnalyzer")]
@@ -20,12 +19,12 @@ RamenTrainingDisplay.Modify((context, display) =>
     display.Training.Modify(RamenTrain.Speed, card =>
     {
         card.AddDescription("友情人数多时优先考虑");
-        card.SetBorder(Color.LightGreen);
+        card.Highlight();
     });
 
     display.Training.ModifyByCommandId(105, card =>
     {
-        card.AddMarkup("[yellow]耐力训练补充说明[/]");
+        card.AddText("耐力训练补充说明");
     });
 
     display.Scenario.Modify("uraf", panel =>
@@ -41,17 +40,17 @@ For simple fixed edits, use `Patch`:
 RamenTrainingDisplay.Patch(p => p
     .Training(RamenTrain.Speed)
     .AddDescription("自定义说明")
-    .Border(Color.Yellow), priority: 100);
+    .Highlight(), priority: 100);
 
 RamenTrainingDisplay.Patch(p =>
 {
-    p.TrainingByCommandId(105).AddMarkup("[aqua]command note[/]");
+    p.TrainingByCommandId(105).AddText("command note");
     p.Important.AddText("重要信息");
-    p.Extra.AddMarkup("[blue]额外信息[/]");
+    p.Extra.AddText("额外信息");
     p.Scenario("uraf").Title("URAF");
 });
 ```
 
-`Modify` can inspect `RamenTrainingDisplayContext` and mutate the display editor directly. `Patch` records simple operations and replays them before render. Both APIs run before `RamenScenarioAnalyzer` calls `LiveDisplay.SetPanel`; they do not expose LiveDisplay or Spectre `Layout`/`Table` internals.
+`Modify` can inspect `RamenTrainingDisplayContext` and mutate the display editor directly. `Patch` records simple operations and replays them before render. Both APIs run before `RamenScenarioAnalyzer` creates immutable plain-text `LiveDisplayContent` for `LiveDisplay.SetPanel`; they do not expose Terminal.Gui `View` instances.
 
 The shared context is required so the registering plugin and `RamenScenarioAnalyzer` use the same static modifier store.

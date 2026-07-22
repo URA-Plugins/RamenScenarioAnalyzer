@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using Gallop;
-using Spectre.Console;
 using UmamusumeResponseAnalyzer;
 
 namespace RamenScenarioAnalyzer;
@@ -82,15 +81,10 @@ public sealed class TrainingPartner
 
         Priority = position is >= 1 and <= 6 ? 0 : 1;
         Shining = supportCard is not null && friendship >= 80 && supportCard.CanTriggerFriendshipTraining(trainingType);
-        var isFriendSupportCard = supportCard is not null && rawName.Contains("[友]", StringComparison.Ordinal);
-        var displayName = Markup.Escape(rawName);
-        if (isFriendSupportCard)
-            displayName = $"[lime]{displayName}[/]";
-        else if (Shining)
-            displayName = $"[aqua]{displayName}[/]";
-        Name = $"{displayName}{(friendship is > 0 and < 100 ? $"[red]{friendship}[/]" : string.Empty)}";
+        var displayName = rawName;
+        Name = $"{displayName}{(friendship is > 0 and < 100 ? $" {friendship}" : string.Empty)}";
         if (command.tips_event_partner_array.Contains(position))
-            Name = $"[red]![/]{Name}";
+            Name = $"!{Name}";
     }
 
     public int Priority { get; }

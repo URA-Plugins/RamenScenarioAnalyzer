@@ -1,6 +1,3 @@
-using Spectre.Console;
-using Spectre.Console.Rendering;
-
 namespace RamenScenarioAnalyzer;
 
 public enum RamenTrain
@@ -112,31 +109,25 @@ public sealed class RamenTrainingCardEditor
         }
     }
 
-    public Color? BorderColor
+    public bool Highlighted
     {
-        get => card.BorderColor;
-        set => card.BorderColor = value;
+        get => card.Highlighted;
+        set => card.Highlighted = value;
     }
 
     public void SetTitle(string title) => Title = title;
 
-    public void SetBorder(Color color) => BorderColor = color;
+    public void Highlight() => Highlighted = true;
 
     public void AddDescription(string text) => AddText(text);
 
     public void AddText(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        AddRow(new Text(text));
+        AddRow(text);
     }
 
-    public void AddMarkup(string markup)
-    {
-        ArgumentNullException.ThrowIfNull(markup);
-        AddRow(new Markup(markup));
-    }
-
-    public void AddRow(IRenderable row)
+    public void AddRow(string row)
     {
         ArgumentNullException.ThrowIfNull(row);
         card.AddRow(row);
@@ -145,9 +136,9 @@ public sealed class RamenTrainingCardEditor
 
 public sealed class RamenDisplayRowsEditor
 {
-    readonly List<IRenderable> rows;
+    readonly List<string> rows;
 
-    internal RamenDisplayRowsEditor(List<IRenderable> rows)
+    internal RamenDisplayRowsEditor(List<string> rows)
     {
         this.rows = rows;
     }
@@ -155,16 +146,10 @@ public sealed class RamenDisplayRowsEditor
     public void AddText(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        AddRow(new Text(text));
+        AddRow(text);
     }
 
-    public void AddMarkup(string markup)
-    {
-        ArgumentNullException.ThrowIfNull(markup);
-        AddRow(new Markup(markup));
-    }
-
-    public void AddRow(IRenderable row)
+    public void AddRow(string row)
     {
         ArgumentNullException.ThrowIfNull(row);
         rows.Add(row);
@@ -197,7 +182,7 @@ public sealed class RamenScenarioPanelsEditor
         if (builder.FindScenarioPanel(key) is not null)
             throw new InvalidOperationException($"拉面杯剧本面板已存在: key={key}");
 
-        var panel = new RamenDisplayPanel(key, title, new Text(string.Empty), showHeader: true);
+        var panel = new RamenDisplayPanel(key, title, string.Empty, showHeader: true);
         builder.ScenarioPanels.Add(panel);
         return new(panel);
     }
@@ -236,41 +221,18 @@ public sealed class RamenDisplayPanelEditor
     public void SetDescription(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        panel.Content = new Text(text);
-    }
-
-    public void SetMarkup(string markup)
-    {
-        ArgumentNullException.ThrowIfNull(markup);
-        panel.Content = new Markup(markup);
+        panel.Content = text;
     }
 
     public void AddText(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        AddRow(new Text(text));
+        AddRow(text);
     }
 
-    public void AddMarkup(string markup)
-    {
-        ArgumentNullException.ThrowIfNull(markup);
-        AddRow(new Markup(markup));
-    }
-
-    public void AddRow(IRenderable row)
+    public void AddRow(string row)
     {
         ArgumentNullException.ThrowIfNull(row);
-        panel.Content = AppendRow(panel.Content, row);
-    }
-
-    static IRenderable AppendRow(IRenderable current, IRenderable row)
-    {
-        var table = new Table();
-        table.HideHeaders();
-        table.NoBorder();
-        table.AddColumn(string.Empty);
-        table.AddRow(current);
-        table.AddRow(row);
-        return table;
+        panel.Content = $"{panel.Content}{Environment.NewLine}{row}";
     }
 }

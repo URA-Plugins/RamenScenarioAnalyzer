@@ -1,7 +1,5 @@
 using Gallop;
 using Gallop.Endpoints;
-using Spectre.Console;
-using Spectre.Console.Rendering;
 using UmamusumeResponseAnalyzer.LiveDisplay;
 using UmamusumeResponseAnalyzer.Plugin;
 
@@ -38,10 +36,13 @@ public sealed class RamenScenarioAnalyzer : IPlugin
     {
         eventLoggerDisplaySubscription?.Dispose();
         eventLoggerDisplaySubscription = null;
-        workspace = null;
-    }
 
-    public Task UpdatePlugin(ProgressContext ctx) => Task.CompletedTask;
+        if (liveDisplay is not null && workspace is not null)
+            liveDisplay.RemoveWorkspace(workspace);
+
+        workspace = null;
+        liveDisplay = null;
+    }
 
     [ResponseAnalyzer<GameApi.SingleModeRamen.ChangeShortCut>(1)]
     public ValueTask Analyze(SingleModeRamenChangeShortCutResponse response)
@@ -237,17 +238,17 @@ public sealed class RamenScenarioAnalyzer : IPlugin
         TurnInfoRamen turn,
         RamenTrainingDisplayBuilder builder)
     {
-        var rows = new List<IRenderable>();
+        var rows = new List<string>();
         if (currentTurn != turn.Turn - 1
             && currentTurn != turn.Turn
             && turn.Turn != 1)
         {
-            rows.Add(new Markup(RamenDisplayText.WrongTurnAlert(currentTurn, turn.Turn)));
+            rows.Add(RamenDisplayText.WrongTurnAlert(currentTurn, turn.Turn));
         }
 
         if (data.CharaInfo.playing_state != 1)
         {
-            rows.Add(new Markup(RamenDisplayText.RepeatTurn));
+            rows.Add(RamenDisplayText.RepeatTurn);
         }
         else
         {
