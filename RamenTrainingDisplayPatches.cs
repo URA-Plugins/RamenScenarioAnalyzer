@@ -186,7 +186,7 @@ sealed record ScenarioPanelAddRow(string Key, string Row) : IRamenTrainingDispla
         var panel = builder.FindScenarioPanel(Key)
             ?? throw new InvalidOperationException($"拉面杯剧本面板不存在: key={Key}");
 
-        panel.Content = $"{panel.Content}{Environment.NewLine}{Row}";
+        panel.AddRow(Row);
     }
 }
 

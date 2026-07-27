@@ -4,7 +4,7 @@
 
 The built-in display also reads `EventLoggerPlugin` summary data and appends available event statistics to the training panel. `EventLoggerPlugin` must be installed with this plugin.
 
-The default training cards follow the same general layout as `BreedersScenarioAnalyzer`: date/status panels, important information, scenario panels, then the five training cards. Command scenario reward totals are shown beside each training level when present; training counts, active effects, and the last command result are shown in the scenario or extra areas.
+The default display follows the same general layout as `BreedersScenarioAnalyzer`: date/status panels, important information, scenario panels, then five horizontal training cards with Extras in a separate right column. Command scenario reward totals are shown beside each training level when present; training counts, active effects, and the last command result are shown in the scenario or extra areas.
 
 Plugins that need to change the training display can reference this project and share the same load context:
 
@@ -51,6 +51,6 @@ RamenTrainingDisplay.Patch(p =>
 });
 ```
 
-`Modify` can inspect `RamenTrainingDisplayContext` and mutate the display editor directly. `Patch` records simple operations and replays them before render. Both APIs run before `RamenScenarioAnalyzer` creates immutable plain-text `LiveDisplayContent` for `LiveDisplay.SetPanel`; they do not expose Terminal.Gui `View` instances.
+`Modify` can inspect `RamenTrainingDisplayContext` and mutate the display editor directly. `Patch` records simple operations and replays them before render. Both APIs run before `RamenScenarioAnalyzer` captures an immutable display snapshot and creates Terminal.Gui views for `LiveDisplay.SetPanel`; they do not expose Terminal.Gui `View` instances.
 
 The shared context is required so the registering plugin and `RamenScenarioAnalyzer` use the same static modifier store.

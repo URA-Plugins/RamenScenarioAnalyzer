@@ -81,15 +81,27 @@ public sealed class TrainingPartner
 
         Priority = position is >= 1 and <= 6 ? 0 : 1;
         Shining = supportCard is not null && friendship >= 80 && supportCard.CanTriggerFriendshipTraining(trainingType);
-        var displayName = rawName;
-        Name = $"{displayName}{(friendship is > 0 and < 100 ? $" {friendship}" : string.Empty)}";
+        var segments = new List<RamenDisplaySegment>();
         if (command.tips_event_partner_array.Contains(position))
-            Name = $"!{Name}";
+            segments.Add(new("!", RamenDisplayColor.Red));
+        segments.Add(new(
+            rawName,
+            supportCard is not null && rawName.Contains("[友]", StringComparison.Ordinal)
+                ? RamenDisplayColor.Lime
+                : Shining
+                    ? RamenDisplayColor.Aqua
+                    : RamenDisplayColor.Normal));
+        if (friendship is > 0 and < 100)
+            segments.Add(new(friendship.ToString(), RamenDisplayColor.Red));
+
+        DisplayLine = new(segments);
+        Name = DisplayLine.Text;
     }
 
     public int Priority { get; }
     public string Name { get; }
     public bool Shining { get; }
+    internal RamenDisplayLine DisplayLine { get; }
 }
 
 public sealed class TrainStats

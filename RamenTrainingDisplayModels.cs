@@ -2,6 +2,54 @@ using Gallop;
 
 namespace RamenScenarioAnalyzer;
 
+internal enum RamenDisplayColor
+{
+    Normal,
+    Cyan,
+    Green,
+    Yellow,
+    Red,
+    DarkOrange,
+    Aqua,
+    Lime,
+    LightGreen
+}
+
+internal readonly record struct RamenDisplaySegment(string Text, RamenDisplayColor Color = RamenDisplayColor.Normal);
+
+internal sealed record RamenDisplayLine(IReadOnlyList<RamenDisplaySegment> Segments, bool IsRule = false)
+{
+    public string Text => string.Concat(Segments.Select(x => x.Text));
+
+    public static RamenDisplayLine Plain(string text) => new([new(text)]);
+
+    public static RamenDisplayLine Colored(string text, RamenDisplayColor color) => new([new(text, color)]);
+
+    public static RamenDisplayLine Styled(params RamenDisplaySegment[] segments) => new(segments);
+
+    public static RamenDisplayLine Rule { get; } = new([new("────────")], IsRule: true);
+}
+
+internal sealed class RamenDisplayRows : IReadOnlyList<string>
+{
+    readonly List<RamenDisplayLine> lines = [];
+
+    public int Count => lines.Count;
+    public string this[int index] => lines[index].Text;
+    internal IReadOnlyList<RamenDisplayLine> Lines => lines;
+
+    public void Add(string row)
+    {
+        foreach (var line in row.ReplaceLineEndings("\n").Split('\n'))
+            Add(RamenDisplayLine.Plain(line));
+    }
+    public void Add(RamenDisplayLine row) => lines.Add(row);
+    public void InsertRange(int index, IEnumerable<RamenDisplayLine> rows) => lines.InsertRange(index, rows);
+
+    public IEnumerator<string> GetEnumerator() => lines.Select(x => x.Text).GetEnumerator();
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
 public sealed class RamenTrainingDisplayContext(
     object response,
     RamenScenarioResponseData responseData,
@@ -19,9 +67,9 @@ internal sealed class RamenTrainingDisplayBuilder
 {
     public List<RamenDisplayPanel> HeaderPanels { get; } = [];
     public List<RamenDisplayPanel> ScenarioPanels { get; } = [];
-    public List<string> ImportantRows { get; } = [];
+    public RamenDisplayRows ImportantRows { get; } = new();
     public List<RamenTrainingCard> TrainingCards { get; } = [];
-    public List<string> ExtraRows { get; } = [];
+    public RamenDisplayRows ExtraRows { get; } = new();
 
     public RamenTrainingCard? FindTrainingCardByCommandId(int commandId)
         => TrainingCards.FirstOrDefault(x => x.CommandId == commandId);
@@ -38,9 +86,28 @@ internal sealed class RamenTrainingDisplayBuilder
         var turn = context.Turn;
         var data = context.ResponseData;
         builder.HeaderPanels.Add(new("date", "日期", $"{turn.Year}{RamenDisplayText.Year} {turn.Month}{RamenDisplayText.Month}{turn.HalfMonth}"));
-        builder.HeaderPanels.Add(new("total", "总属性", $"总属性: {turn.StatsRevised.Sum()}, Pt: {data.CharaInfo.skill_point}"));
-        builder.HeaderPanels.Add(new("vital", "体力", $"{RamenDisplayText.Vital}: {turn.Vital}/{turn.MaxVital}"));
-        builder.HeaderPanels.Add(new("motivation", "干劲", RamenDisplayText.Motivation(data.CharaInfo.motivation)));
+        builder.HeaderPanels.Add(new(
+            "total",
+            "总属性",
+            RamenDisplayLine.Colored($"总属性: {turn.StatsRevised.Sum()}, Pt: {data.CharaInfo.skill_point}", RamenDisplayColor.Cyan)));
+        builder.HeaderPanels.Add(new(
+            "vital",
+            "体力",
+            RamenDisplayLine.Styled(
+                new($"{RamenDisplayText.Vital}: "),
+                new(turn.Vital.ToString(), RamenDisplayColor.Green),
+                new($"/{turn.MaxVital}"))));
+        builder.HeaderPanels.Add(new(
+            "motivation",
+            "干劲",
+            RamenDisplayLine.Colored(
+                RamenDisplayText.Motivation(data.CharaInfo.motivation),
+                data.CharaInfo.motivation switch
+                {
+                    5 => RamenDisplayColor.Green,
+                    4 => RamenDisplayColor.Yellow,
+                    _ => RamenDisplayColor.Red
+                })));
 
         builder.ScenarioPanels.Add(new("special-feeling", "特殊心得", $"特殊心得: {context.DataSet.special_feeling_num}"));
         builder.ScenarioPanels.Add(new("feeling", "心得", $"心得: {context.DataSet.feeling_info_array?.Length ?? 0}"));
@@ -56,9 +123,13 @@ internal sealed class RamenTrainingDisplayBuilder
             builder.ExtraRows.Add($"上次命令: {data.CommandResult.command_id}, result={data.CommandResult.result_state}");
         var homeInfo = data.HomeInfo ?? throw new InvalidOperationException("Ramen 训练显示需要 home_info。");
         if (homeInfo.command_info_array.Count(x => x.is_enable == 1) <= 1)
-            builder.ImportantRows.Add($"非训练回合 playingState = {data.CharaInfo.playing_state}");
+            builder.ImportantRows.Add(RamenDisplayLine.Colored(
+                $"非训练回合 playingState = {data.CharaInfo.playing_state}",
+                RamenDisplayColor.Aqua));
         if (data.CharaInfo.skill_point > 9500)
-            builder.ImportantRows.Add("剩余PT>9500（上限9999），请及时学习技能");
+            builder.ImportantRows.Add(RamenDisplayLine.Colored(
+                "剩余PT>9500（上限9999），请及时学习技能",
+                RamenDisplayColor.Red));
 
         var maxScore = context.TrainStats.Count == 0 ? 0 : context.TrainStats.Max(x => x.FiveValueGain.Sum());
         foreach (var command in turn.CommandInfoArray)
@@ -76,15 +147,34 @@ internal sealed class RamenTrainingDisplayBuilder
 
     static RamenTrainingCard CreateTrainingCard(TurnInfoRamen turn, RamenCommandInfo command, TrainStats stats, int maxScore)
     {
-        var failureRate = stats.FailureRate > 0 ? $" ({stats.FailureRate}%)" : string.Empty;
         var card = new RamenTrainingCard(command.CommandId, command.TrainIndex)
         {
-            Title = $"{RamenDisplayText.TrainName(command.TrainIndex)}{failureRate}"
+            StyledTitle = stats.FailureRate > 0
+                ? RamenDisplayLine.Styled(
+                    new(RamenDisplayText.TrainName(command.TrainIndex)),
+                    new(
+                        $"({stats.FailureRate}%)",
+                        stats.FailureRate switch
+                        {
+                            >= 40 => RamenDisplayColor.Red,
+                            >= 20 => RamenDisplayColor.DarkOrange,
+                            _ => RamenDisplayColor.Yellow
+                        }))
+                : RamenDisplayLine.Plain(RamenDisplayText.TrainName(command.TrainIndex))
         };
         var currentStat = turn.StatsRevised[command.TrainIndex - 1];
         var statUpToMax = turn.MaxStatsRevised[command.TrainIndex - 1] - currentStat;
         card.AddRow(RamenDisplayText.CurrentRemainStat);
-        card.AddRow($"{currentStat}:{statUpToMax}");
+        card.AddRow(RamenDisplayLine.Styled(
+            new($"{currentStat}:"),
+            new(
+                statUpToMax.ToString(),
+                statUpToMax switch
+                {
+                    > 400 => RamenDisplayColor.Normal,
+                    > 200 => RamenDisplayColor.Yellow,
+                    _ => RamenDisplayColor.Red
+                })));
         card.AddRule();
         card.AddRow(command.ScenarioRewardTotal is { } rewardTotal
             ? $"Lv{command.TrainLevel} | {rewardTotal}"
@@ -92,14 +182,18 @@ internal sealed class RamenTrainingDisplayBuilder
         card.AddRule();
 
         var score = stats.FiveValueGain.Sum();
-        card.AddRow($"{RamenDisplayText.StatSimple}:{score}|Pt:{stats.PtGain}{(score == maxScore ? " ★" : string.Empty)}");
+        card.AddRow(RamenDisplayLine.Styled(
+            new($"{RamenDisplayText.StatSimple}:"),
+            new(score.ToString(), score == maxScore ? RamenDisplayColor.Aqua : RamenDisplayColor.Normal),
+            new($"|Pt:{stats.PtGain}")));
         foreach (var trainingPartner in command.TrainingPartners)
         {
-            card.AddRow(trainingPartner.Name);
+            card.AddRow(trainingPartner.DisplayLine);
             card.Highlighted |= trainingPartner.Shining;
         }
         for (var i = 8 - command.TrainingPartners.Count; i > 0; i--)
             card.AddRow(string.Empty);
+        card.AddRule();
         return card;
     }
 }
@@ -156,19 +250,60 @@ internal static class RamenDisplayText
 
 internal sealed class RamenDisplayPanel(string key, string title, string content, bool showHeader = false)
 {
+    RamenDisplayRows contentRows = CreateRows(content);
+
+    public RamenDisplayPanel(string key, string title, RamenDisplayLine content, bool showHeader = false)
+        : this(key, title, content.Text, showHeader)
+    {
+        contentRows = CreateRows(content);
+    }
+
     public string Key { get; } = key;
     public string Title { get; set; } = title;
-    public string Content { get; set; } = content;
+    public string Content
+    {
+        get => string.Join(Environment.NewLine, contentRows);
+        set => contentRows = CreateRows(value);
+    }
     public bool ShowHeader { get; set; } = showHeader;
+    internal IReadOnlyList<RamenDisplayLine> Lines => contentRows.Lines;
+
+    internal void AddRow(string row) => contentRows.Add(row);
+
+    static RamenDisplayRows CreateRows(RamenDisplayLine line)
+    {
+        var rows = new RamenDisplayRows();
+        rows.Add(line);
+        return rows;
+    }
+
+    static RamenDisplayRows CreateRows(string text)
+    {
+        var rows = new RamenDisplayRows();
+        rows.Add(text);
+        return rows;
+    }
 }
 
 internal sealed class RamenTrainingCard(int commandId, int trainIndex)
 {
+    RamenDisplayLine title = RamenDisplayLine.Plain(commandId.ToString());
+
     public int CommandId { get; } = commandId;
     public int TrainIndex { get; } = trainIndex;
-    public string Title { get; set; } = commandId.ToString();
-    public List<string> Rows { get; } = [];
+    public string Title
+    {
+        get => title.Text;
+        set => title = RamenDisplayLine.Plain(value);
+    }
+    public RamenDisplayRows Rows { get; } = new();
     public bool Highlighted { get; set; }
+    internal RamenDisplayLine StyledTitle
+    {
+        get => title;
+        set => title = value;
+    }
     public void AddRow(string row) => Rows.Add(row);
-    public void AddRule() => Rows.Add("────────");
+    public void AddRow(RamenDisplayLine row) => Rows.Add(row);
+    public void AddRule() => Rows.Add(RamenDisplayLine.Rule);
 }

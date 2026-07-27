@@ -18,53 +18,83 @@ internal static class RamenEventLoggerDisplay
 
         var hasCurrentTrainingHistory = HasCurrentTrainingHistory(snapshot, context);
         foreach (var row in ImportantRows(snapshot, hasCurrentTrainingHistory))
-            display.Important.AddText(row);
+            display.Important.AddRow(row);
 
         foreach (var row in ExtraRows(snapshot, hasCurrentTrainingHistory))
-            display.Extra.AddText(row);
+            display.Extra.AddRow(row);
     }
 
-    static IEnumerable<string> ImportantRows(EventLoggerDisplaySnapshot snapshot, bool hasCurrentTrainingHistory)
+    static IEnumerable<RamenDisplayLine> ImportantRows(
+        EventLoggerDisplaySnapshot snapshot,
+        bool hasCurrentTrainingHistory)
     {
         if (snapshot.CardEvents.Appeared > 0)
         {
             yield return snapshot.CardEvents.Finished >= 5
-                ? "连续事件全部完成"
-                : $"连续事件: 出现 {snapshot.CardEvents.Appeared} 次, " +
-                  $"走完 {snapshot.CardEvents.Finished} 张, " +
-                  $"剩余 {snapshot.CardEvents.Remaining} 个";
+                ? RamenDisplayLine.Colored("连续事件全部完成", RamenDisplayColor.Green)
+                : RamenDisplayLine.Styled(
+                    new("连续事件: 出现"),
+                    new(snapshot.CardEvents.Appeared.ToString(), RamenDisplayColor.Yellow),
+                    new("次, 走完"),
+                    new(snapshot.CardEvents.Finished.ToString(), RamenDisplayColor.Yellow),
+                    new("张, 剩余"),
+                    new(snapshot.CardEvents.Remaining.ToString(), RamenDisplayColor.Yellow),
+                    new("个"));
         }
 
         if (hasCurrentTrainingHistory && snapshot.TrainingFailures is { } failures)
         {
-            yield return $"训练赌博: {failures.GambleTimes} 次, " +
-                         $"失败 {failures.FailureTimes} 次, " +
-                         $"总失败率 {failures.TotalFailureRate}%";
+            yield return RamenDisplayLine.Styled(
+                new("训练赌博: "),
+                new(failures.GambleTimes.ToString(), RamenDisplayColor.Yellow),
+                new("次, 失败"),
+                new(failures.FailureTimes.ToString(), RamenDisplayColor.Yellow),
+                new("次, 总失败率"),
+                new(failures.TotalFailureRate.ToString(), RamenDisplayColor.Yellow),
+                new("%"));
         }
     }
 
-    static IEnumerable<string> ExtraRows(EventLoggerDisplaySnapshot snapshot, bool hasCurrentTrainingHistory)
+    static IEnumerable<RamenDisplayLine> ExtraRows(
+        EventLoggerDisplaySnapshot snapshot,
+        bool hasCurrentTrainingHistory)
     {
         if (snapshot.EventCount > 0)
-            yield return $"事件数: {snapshot.EventCount}";
+            yield return RamenDisplayLine.Styled(
+                new("事件数: "),
+                new(snapshot.EventCount.ToString(), RamenDisplayColor.Yellow));
 
         if (snapshot.SuccessEvents.Appeared > 0)
         {
-            yield return $"赌狗事件: {snapshot.SuccessEvents.Appeared} 次, " +
-                         $"选择 {snapshot.SuccessEvents.Selected} 次, " +
-                         $"成功 {snapshot.SuccessEvents.Succeeded} 次";
+            yield return RamenDisplayLine.Styled(
+                new("赌狗事件: "),
+                new(snapshot.SuccessEvents.Appeared.ToString(), RamenDisplayColor.Yellow),
+                new("次, 选择"),
+                new(snapshot.SuccessEvents.Selected.ToString(), RamenDisplayColor.Yellow),
+                new("次, 成功"),
+                new(snapshot.SuccessEvents.Succeeded.ToString(), RamenDisplayColor.Yellow),
+                new("次"));
         }
 
         if (hasCurrentTrainingHistory && snapshot.ScenarioFriend is { } friend)
         {
-            yield return $"{friend.Label}: 点击 {friend.ClickedTimes} 次, 启动 {friend.ActivatedTimes} 次";
+            yield return RamenDisplayLine.Styled(
+                new($"{friend.Label}: 点击"),
+                new(friend.ClickedTimes.ToString(), RamenDisplayColor.Aqua),
+                new("次, 启动"),
+                new(friend.ActivatedTimes.ToString(), RamenDisplayColor.Aqua),
+                new("次"));
         }
 
         if (snapshot.InheritStats.Count > 0)
-            yield return $"继承属性: {string.Join('+', snapshot.InheritStats)}";
+            yield return RamenDisplayLine.Styled(
+                new("继承属性: "),
+                new(string.Join('+', snapshot.InheritStats), RamenDisplayColor.Cyan));
 
         if (snapshot.RaceWinCount > 0)
-            yield return $"胜场: {snapshot.RaceWinCount}";
+            yield return RamenDisplayLine.Styled(
+                new("胜场: "),
+                new(snapshot.RaceWinCount.ToString(), RamenDisplayColor.Yellow));
     }
 
     static bool HasCurrentTrainingHistory(EventLoggerDisplaySnapshot snapshot, RamenTrainingDisplayContext context)

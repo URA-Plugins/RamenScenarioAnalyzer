@@ -238,17 +238,19 @@ public sealed class RamenScenarioAnalyzer : IPlugin
         TurnInfoRamen turn,
         RamenTrainingDisplayBuilder builder)
     {
-        var rows = new List<string>();
+        var rows = new List<RamenDisplayLine>();
         if (currentTurn != turn.Turn - 1
             && currentTurn != turn.Turn
             && turn.Turn != 1)
         {
-            rows.Add(RamenDisplayText.WrongTurnAlert(currentTurn, turn.Turn));
+            rows.Add(RamenDisplayLine.Colored(
+                RamenDisplayText.WrongTurnAlert(currentTurn, turn.Turn),
+                RamenDisplayColor.Red));
         }
 
         if (data.CharaInfo.playing_state != 1)
         {
-            rows.Add(RamenDisplayText.RepeatTurn);
+            rows.Add(RamenDisplayLine.Colored(RamenDisplayText.RepeatTurn, RamenDisplayColor.Yellow));
         }
         else
         {

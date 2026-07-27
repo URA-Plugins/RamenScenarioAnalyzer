@@ -136,9 +136,9 @@ public sealed class RamenTrainingCardEditor
 
 public sealed class RamenDisplayRowsEditor
 {
-    readonly List<string> rows;
+    readonly RamenDisplayRows rows;
 
-    internal RamenDisplayRowsEditor(List<string> rows)
+    internal RamenDisplayRowsEditor(RamenDisplayRows rows)
     {
         this.rows = rows;
     }
@@ -154,6 +154,8 @@ public sealed class RamenDisplayRowsEditor
         ArgumentNullException.ThrowIfNull(row);
         rows.Add(row);
     }
+
+    internal void AddRow(RamenDisplayLine row) => rows.Add(row);
 }
 
 public sealed class RamenScenarioPanelsEditor
@@ -233,6 +235,6 @@ public sealed class RamenDisplayPanelEditor
     public void AddRow(string row)
     {
         ArgumentNullException.ThrowIfNull(row);
-        panel.Content = $"{panel.Content}{Environment.NewLine}{row}";
+        panel.AddRow(row);
     }
 }
