@@ -25,7 +25,6 @@ public sealed class RamenScenarioAnalyzer : IPlugin
     public void Initialize(IPluginContext context)
     {
         liveDisplay = context.LiveDisplay;
-        workspace = LiveDisplay.CreateWorkspace(WorkspaceTitle);
         checkedBootstrapWorkspace = false;
         currentTurn = 0;
         eventLoggerDisplaySubscription?.Dispose();
@@ -294,5 +293,5 @@ public sealed class RamenScenarioAnalyzer : IPlugin
         ?? throw new InvalidOperationException("RamenScenarioAnalyzer 尚未初始化 LiveDisplay。");
 
     LiveDisplayWorkspace Workspace => workspace
-        ?? throw new InvalidOperationException("RamenScenarioAnalyzer 尚未创建 LiveDisplay workspace。");
+        ??= LiveDisplay.CreateWorkspace(WorkspaceTitle);
 }
