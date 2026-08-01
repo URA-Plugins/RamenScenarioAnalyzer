@@ -377,7 +377,7 @@ public sealed class RamenScenarioAnalyzer : IPlugin
             if (switchFromBootstrap && Workspace.Current?.Title == "启动")
                 target.SwitchTo();
 
-            target.SetPanel(TrainingPanelKey, "拉面杯训练", content, fullBleed: true);
+            target.SetPanel(TrainingPanelKey, "拉面杯训练", content, fullBleed: true, switchToWorkspace: false);
             panelPublished = true;
         }
         finally
