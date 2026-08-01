@@ -5,16 +5,16 @@ using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using TAttribute = Terminal.Gui.Drawing.Attribute;
 using TColor = Terminal.Gui.Drawing.Color;
-using UmamusumeResponseAnalyzer.LiveDisplay;
+using UmamusumeResponseAnalyzer.TerminalGui;
 
 namespace RamenScenarioAnalyzer;
 
 internal static class RamenTrainingDisplayRenderer
 {
-    public static LiveDisplayContent Render(RamenTrainingDisplayBuilder builder)
+    public static WorkspaceContent Render(RamenTrainingDisplayBuilder builder)
     {
         var snapshot = RamenDisplaySnapshot.Create(builder);
-        return new LiveDisplayContent(() => new RamenDashboardView(snapshot));
+        return new WorkspaceContent(() => new RamenDashboardView(snapshot));
     }
 
     sealed record RamenDisplaySnapshot(

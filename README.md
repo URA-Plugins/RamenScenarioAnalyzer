@@ -1,6 +1,6 @@
 # RamenScenarioAnalyzer
 
-`RamenScenarioAnalyzer` renders Ramen scenario training information through LiveDisplay when a response contains `chara_info`, `ramen_data_set`, `home_info.command_info_array`, and the five base training commands.
+`RamenScenarioAnalyzer` renders Ramen scenario training information in a workspace when a response contains `chara_info`, `ramen_data_set`, `home_info.command_info_array`, and the five base training commands.
 
 The built-in display also reads `EventLoggerPlugin` summary data and appends available event statistics to the training panel. `EventLoggerPlugin` must be installed with this plugin.
 
@@ -51,6 +51,6 @@ RamenTrainingDisplay.Patch(p =>
 });
 ```
 
-`Modify` can inspect `RamenTrainingDisplayContext` and mutate the display editor directly. `Patch` records simple operations and replays them before render. Both APIs run before `RamenScenarioAnalyzer` captures an immutable display snapshot and creates Terminal.Gui views for `LiveDisplay.SetPanel`; they do not expose Terminal.Gui `View` instances.
+`Modify` can inspect `RamenTrainingDisplayContext` and mutate the display editor directly. `Patch` records simple operations and replays them before render. Both APIs run before `RamenScenarioAnalyzer` captures an immutable display snapshot, creates the workspace with `Workspace.Create`, and publishes Terminal.Gui views with `workspace.SetPanel`; they do not expose Terminal.Gui `View` instances.
 
 The shared context is required so the registering plugin and `RamenScenarioAnalyzer` use the same static modifier store.
