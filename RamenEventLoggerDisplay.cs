@@ -1,16 +1,10 @@
 using EventLoggerPlugin;
-using UmamusumeResponseAnalyzer.Plugin;
-
-[assembly: SharedContextWith("EventLoggerPlugin")]
 
 namespace RamenScenarioAnalyzer;
 
 internal static class RamenEventLoggerDisplay
 {
-    public static IDisposable Register()
-        => RamenTrainingDisplay.Modify(Apply, priority: 50);
-
-    internal static void Apply(RamenTrainingDisplayContext context, RamenTrainingDisplayEditor display)
+    internal static void Apply(RamenTrainingDisplayContext context, RamenTrainingDisplayBuilder display)
     {
         var snapshot = EventLoggerDisplaySource.Current;
         if (!snapshot.HasData)
@@ -18,10 +12,10 @@ internal static class RamenEventLoggerDisplay
 
         var hasCurrentTrainingHistory = HasCurrentTrainingHistory(snapshot, context);
         foreach (var row in ImportantRows(snapshot, hasCurrentTrainingHistory))
-            display.Important.AddRow(row);
+            display.ImportantRows.Add(row);
 
         foreach (var row in ExtraRows(snapshot, hasCurrentTrainingHistory))
-            display.Extra.AddRow(row);
+            display.ExtraRows.Add(row);
     }
 
     static IEnumerable<RamenDisplayLine> ImportantRows(

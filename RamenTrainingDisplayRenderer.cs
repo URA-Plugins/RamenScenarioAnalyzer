@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Drawing;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Text;
@@ -9,65 +10,62 @@ using UmamusumeResponseAnalyzer.TerminalGui;
 
 namespace RamenScenarioAnalyzer;
 
+internal sealed record RamenDisplaySnapshot(
+    int MainWidth,
+    ImmutableArray<RamenPanelSnapshot> Headers,
+    ImmutableArray<RamenDisplayLine> ImportantRows,
+    ImmutableArray<RamenPanelSnapshot> ScenarioPanels,
+    ImmutableArray<RamenTrainingCardSnapshot> TrainingCards,
+    ImmutableArray<RamenDisplayLine> ExtraRows)
+{
+    public static RamenDisplaySnapshot Create(RamenTrainingDisplayBuilder builder)
+    {
+        var mainWidth = CommandInfoLayout.Current.MainSectionWidth;
+        return new(
+            mainWidth,
+            [.. builder.HeaderPanels.Select(RamenPanelSnapshot.Create)],
+            [.. builder.ImportantRows.Lines.Select(Copy)],
+            [.. builder.ScenarioPanels.Select(RamenPanelSnapshot.Create)],
+            [.. builder.TrainingCards.Select(RamenTrainingCardSnapshot.Create)],
+            [.. builder.ExtraRows.Lines.Select(Copy)]);
+    }
+
+    internal static RamenDisplayLine Copy(RamenDisplayLine line)
+        => new(line.Segments.ToImmutableArray(), line.IsRule);
+}
+
+internal sealed record RamenPanelSnapshot(
+    string Key,
+    string Title,
+    bool ShowHeader,
+    ImmutableArray<RamenDisplayLine> Lines)
+{
+    public static RamenPanelSnapshot Create(RamenDisplayPanel panel)
+        => new(
+            panel.Key,
+            panel.Title,
+            panel.ShowHeader,
+            [.. panel.Lines.Select(RamenDisplaySnapshot.Copy)]);
+}
+
+internal sealed record RamenTrainingCardSnapshot(
+    int TrainIndex,
+    RamenDisplayLine Title,
+    bool Highlighted,
+    ImmutableArray<RamenDisplayLine> Rows)
+{
+    public static RamenTrainingCardSnapshot Create(RamenTrainingCard card)
+        => new(
+            card.TrainIndex,
+            RamenDisplaySnapshot.Copy(card.StyledTitle),
+            card.Highlighted,
+            [.. card.Rows.Lines.Select(RamenDisplaySnapshot.Copy)]);
+}
+
 internal static class RamenTrainingDisplayRenderer
 {
-    public static WorkspaceContent Render(RamenTrainingDisplayBuilder builder)
-    {
-        var snapshot = RamenDisplaySnapshot.Create(builder);
-        return new WorkspaceContent(() => new RamenDashboardView(snapshot));
-    }
-
-    sealed record RamenDisplaySnapshot(
-        int MainWidth,
-        RamenPanelSnapshot[] Headers,
-        RamenDisplayLine[] ImportantRows,
-        RamenPanelSnapshot[] ScenarioPanels,
-        RamenTrainingCardSnapshot[] TrainingCards,
-        RamenDisplayLine[] ExtraRows)
-    {
-        public static RamenDisplaySnapshot Create(RamenTrainingDisplayBuilder builder)
-        {
-            var mainWidth = CommandInfoLayout.Current.MainSectionWidth;
-            return new(
-                mainWidth,
-                [.. builder.HeaderPanels.Select(RamenPanelSnapshot.Create)],
-                [.. builder.ImportantRows.Lines.Select(Copy)],
-                [.. builder.ScenarioPanels.Select(RamenPanelSnapshot.Create)],
-                [.. builder.TrainingCards.Select(RamenTrainingCardSnapshot.Create)],
-                [.. builder.ExtraRows.Lines.Select(Copy)]);
-        }
-
-        internal static RamenDisplayLine Copy(RamenDisplayLine line)
-            => new([.. line.Segments], line.IsRule);
-    }
-
-    sealed record RamenPanelSnapshot(
-        string Key,
-        string Title,
-        bool ShowHeader,
-        RamenDisplayLine[] Lines)
-    {
-        public static RamenPanelSnapshot Create(RamenDisplayPanel panel)
-            => new(
-                panel.Key,
-                panel.Title,
-                panel.ShowHeader,
-                [.. panel.Lines.Select(RamenDisplaySnapshot.Copy)]);
-    }
-
-    sealed record RamenTrainingCardSnapshot(
-        int TrainIndex,
-        RamenDisplayLine Title,
-        bool Highlighted,
-        RamenDisplayLine[] Rows)
-    {
-        public static RamenTrainingCardSnapshot Create(RamenTrainingCard card)
-            => new(
-                card.TrainIndex,
-                RamenDisplaySnapshot.Copy(card.StyledTitle),
-                card.Highlighted,
-                [.. card.Rows.Lines.Select(RamenDisplaySnapshot.Copy)]);
-    }
+    public static WorkspaceContent Render(RamenDisplaySnapshot snapshot)
+        => new(() => new RamenDashboardView(snapshot));
 
     sealed class RamenDashboardView : View
     {

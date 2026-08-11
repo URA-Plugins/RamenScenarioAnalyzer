@@ -50,7 +50,7 @@ internal sealed class RamenDisplayRows : IReadOnlyList<string>
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-public sealed class RamenTrainingDisplayContext(
+internal sealed class RamenTrainingDisplayContext(
     object response,
     RamenScenarioResponseData responseData,
     TurnInfoRamen turn,

@@ -7,10 +7,12 @@
     <Nullable>enable</Nullable>
     <Version>2026.07.02</Version>
 
+    <PluginInternalName>RamenScenarioAnalyzer</PluginInternalName>
     <PluginDisplayName>RamenScenarioAnalyzer</PluginDisplayName>
     <PluginAuthor>UmamusumeResponseAnalyzer</PluginAuthor>
     <PluginDescription>解析拉面杯回合训练信息</PluginDescription>
     <PluginDependencies>EventLoggerPlugin</PluginDependencies>
+    <PluginTargets>Cygames</PluginTargets>
   </PropertyGroup>
 
   <ItemGroup>

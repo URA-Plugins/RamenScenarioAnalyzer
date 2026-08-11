@@ -70,10 +70,11 @@ public sealed class TrainingPartner
         int position,
         SingleModeCommandInfo command)
     {
-        var supportCard = position is >= 1 and <= 6
-            ? Database.Names.GetSupportCard(response.CharaInfo.support_card_array.First(x => x.position == position).support_card_id)
-            : null;
-        var rawName = supportCard?.Nickname ?? Database.Names.GetCharacter(position).Nickname;
+        var supportCardId = position is >= 1 and <= 6
+            ? response.CharaInfo.support_card_array.First(x => x.position == position).support_card_id
+            : (int?)null;
+        var supportCard = supportCardId is { } id ? Database.Names.GetRequiredSupportCard(id) : null;
+        var rawName = Database.Names.DisplayNickname(supportCardId ?? position);
         var friendship = response.CharaInfo.evaluation_info_array.FirstOrDefault(x => x.target_id == position)?.evaluation ?? 0;
         var trainingType = TurnInfoRamen.ToTrainId.TryGetValue(command.command_id, out var baseCommandId)
             ? baseCommandId
@@ -86,7 +87,7 @@ public sealed class TrainingPartner
             segments.Add(new("!", RamenDisplayColor.Red));
         segments.Add(new(
             rawName,
-            supportCard is not null && rawName.Contains("[友]", StringComparison.Ordinal)
+            supportCard is not null && supportCard.IsFriendCard
                 ? RamenDisplayColor.Lime
                 : Shining
                     ? RamenDisplayColor.Aqua
