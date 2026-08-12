@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Drawing;
 using Terminal.Gui.Drawing;
+using Terminal.Gui.Input;
 using Terminal.Gui.Text;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -67,6 +68,13 @@ internal static class RamenTrainingDisplayRenderer
     public static WorkspaceContent Render(RamenDisplaySnapshot snapshot)
         => new(() => new RamenDashboardView(snapshot));
 
+    internal static bool TryScroll(View view, Command command)
+    {
+        if (view is not RamenDashboardView dashboard)
+            return false;
+        return dashboard.Scroll(command);
+    }
+
     sealed class RamenDashboardView : View
     {
         const int HeaderHeight = 3;
@@ -89,6 +97,14 @@ internal static class RamenTrainingDisplayRenderer
             CanFocus = true;
             TabStop = TabBehavior.TabGroup;
             ViewportSettings = ViewportSettingsFlags.HasScrollBars;
+            AddCommand(Command.PageUp, () => Scroll(Command.PageUp));
+            AddCommand(Command.PageDown, () => Scroll(Command.PageDown));
+            AddCommand(Command.Start, () => Scroll(Command.Start));
+            AddCommand(Command.End, () => Scroll(Command.End));
+            KeyBindings.ReplaceCommands(Key.PageUp, Command.PageUp);
+            KeyBindings.ReplaceCommands(Key.PageDown, Command.PageDown);
+            KeyBindings.ReplaceCommands(Key.Home, Command.Start);
+            KeyBindings.ReplaceCommands(Key.End, Command.End);
 
             mainWidth = snapshot.MainWidth;
             minimumContentWidth = mainWidth + (mainWidth + 3) / 4;
@@ -164,6 +180,23 @@ internal static class RamenTrainingDisplayRenderer
             }
 
             base.OnSubViewLayout(args);
+        }
+
+        internal bool Scroll(Command command)
+        {
+            var amount = command switch
+            {
+                Command.PageUp => -Math.Max(1, Viewport.Height),
+                Command.PageDown => Math.Max(1, Viewport.Height),
+                Command.Start => -GetContentSize().Height,
+                Command.End => GetContentSize().Height,
+                _ => 0,
+            };
+            if (amount == 0)
+                return false;
+
+            ScrollVertical(amount);
+            return true;
         }
 
         void AddHeaderFrames(IReadOnlyList<RamenPanelSnapshot> panels, RamenPalette palette)

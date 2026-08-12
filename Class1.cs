@@ -12,11 +12,14 @@ public sealed class RamenScenarioAnalyzer : IPlugin
         "^/umamusume/single_mode_ramen/(?:change_short_cut|check_event|check_point|continue|exec_command|finish_claw_crane|gain_skills|race_end|race_entry|race_out|ramen_live|select_region|tasting|uraf_effect_apply)$";
 
     readonly object stateGate = new();
+    readonly RamenDisplayHistory history = new(WorkspaceTitle, TrainingPanelKey, "拉面杯训练");
     Workspace? workspace;
     int currentTurn;
 
     public void Initialize(IPluginContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        history.Initialize(context.Application);
         context.Analyzers.Register<SingleModeRamenExecCommandResponse>(
             AnalyzerKind.Response,
             [EndpointPattern.Regex(CommonResponseEndpoints)],
@@ -31,9 +34,18 @@ public sealed class RamenScenarioAnalyzer : IPlugin
 
     public void Dispose()
     {
-        workspace?.RemovePanel(TrainingPanelKey);
-        workspace = null;
+        history.Stop();
+        lock (stateGate)
+        {
+            workspace?.RemovePanel(TrainingPanelKey);
+            workspace = null;
+        }
     }
+
+    public Task ConfigPromptAsync(
+        Terminal.Gui.App.IApplication application,
+        CancellationToken cancellationToken = default)
+        => history.ConfigPromptAsync(application, cancellationToken);
 
     ValueTask Analyze(SingleModeRamenLoadResponse response)
     {
@@ -70,12 +82,13 @@ public sealed class RamenScenarioAnalyzer : IPlugin
             AddTurnStateImportantRows(data, turn, builder);
             RamenEventLoggerDisplay.Apply(context, builder);
             var snapshot = RamenDisplaySnapshot.Create(builder);
-            DisplayWorkspace.SetPanel(
-                TrainingPanelKey,
-                "拉面杯训练",
+            var target = Workspace.Create(WorkspaceTitle);
+            history.Publish(
+                target,
+                new(data.CharaInfo.single_mode_chara_id, data.CharaInfo.turn),
                 RamenTrainingDisplayRenderer.Render(snapshot),
-                fullBleed: true,
-                switchToWorkspace: true);
+                switchToWorkspace: true,
+                () => workspace = target);
         }
 
         return ValueTask.CompletedTask;
@@ -125,7 +138,4 @@ public sealed class RamenScenarioAnalyzer : IPlugin
         if (rows.Count > 0)
             builder.ImportantRows.InsertRange(0, rows);
     }
-
-    Workspace DisplayWorkspace => workspace
-        ??= Workspace.Create(WorkspaceTitle);
 }
