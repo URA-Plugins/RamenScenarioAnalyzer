@@ -11,18 +11,11 @@
     <PluginDisplayName>RamenScenarioAnalyzer</PluginDisplayName>
     <PluginAuthor>UmamusumeResponseAnalyzer</PluginAuthor>
     <PluginDescription>解析拉面杯回合训练信息</PluginDescription>
-    <PluginDependencies>EventLoggerPlugin</PluginDependencies>
     <PluginTargets>Cygames</PluginTargets>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="RamenScenarioAnalyzerPatchDslSmoke" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\EventLoggerPlugin\EventLoggerPlugin.csproj">
-      <Private>false</Private>
-    </ProjectReference>
   </ItemGroup>
 
 </Project>

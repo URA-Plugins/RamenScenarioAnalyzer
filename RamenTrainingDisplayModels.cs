@@ -2,7 +2,7 @@ using Gallop;
 
 namespace RamenScenarioAnalyzer;
 
-internal enum RamenDisplayColor
+public enum RamenDisplayColor
 {
     Normal,
     Cyan,
@@ -15,7 +15,7 @@ internal enum RamenDisplayColor
     LightGreen
 }
 
-internal readonly record struct RamenDisplaySegment(string Text, RamenDisplayColor Color = RamenDisplayColor.Normal);
+public readonly record struct RamenDisplaySegment(string Text, RamenDisplayColor Color = RamenDisplayColor.Normal);
 
 internal sealed record RamenDisplayLine(IReadOnlyList<RamenDisplaySegment> Segments, bool IsRule = false)
 {
@@ -50,16 +50,18 @@ internal sealed class RamenDisplayRows : IReadOnlyList<string>
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-internal sealed class RamenTrainingDisplayContext(
+public sealed class RamenTrainingDisplayContext(
     object response,
     RamenScenarioResponseData responseData,
     TurnInfoRamen turn,
-    IReadOnlyList<TrainStats> trainStats)
+    IReadOnlyList<TrainStats> trainStats,
+    int previousTurn)
 {
     public object Response { get; } = response;
     public RamenScenarioResponseData ResponseData { get; } = responseData;
     public TurnInfoRamen Turn { get; } = turn;
     public IReadOnlyList<TrainStats> TrainStats { get; } = trainStats;
+    public int PreviousTurn { get; } = previousTurn;
     public SingleModeRamenDataSet DataSet => Turn.DataSet;
 }
 
@@ -269,6 +271,7 @@ internal sealed class RamenDisplayPanel(string key, string title, string content
     internal IReadOnlyList<RamenDisplayLine> Lines => contentRows.Lines;
 
     internal void AddRow(string row) => contentRows.Add(row);
+    internal void AddRow(RamenDisplayLine row) => contentRows.Add(row);
 
     static RamenDisplayRows CreateRows(RamenDisplayLine line)
     {
