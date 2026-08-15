@@ -10,99 +10,110 @@ public enum RamenTrain
     Wisdom = 5
 }
 
+public readonly record struct RamenTrainingDisplayId(int SingleModeCharaId, int Turn);
+
 public static class RamenTrainingDisplay
 {
-    static readonly object CurrentGate = new();
-    static readonly List<ModifierRegistration> Modifiers = [];
-    static CurrentDisplay? currentDisplay;
+    static readonly object Gate = new();
+    static readonly Dictionary<RamenTrainingDisplayId, DisplayUnit> Units = [];
+    static long nextProducerSequence;
 
-    public static IDisposable RegisterModifier(
-        Action<RamenTrainingDisplayContext, RamenTrainingDisplayEditor> modifier)
+    public static RamenTrainingDisplayPartProducer RegisterPartProducer()
+        => new(Interlocked.Increment(ref nextProducerSequence));
+
+    internal static void Update(
+        object owner,
+        RamenTrainingDisplayId id,
+        RamenTrainingDisplayContext context,
+        Func<RamenTrainingDisplayContext, RamenTrainingDisplayBuilder> createBuilder,
+        Action<RamenTrainingDisplayId, UmamusumeResponseAnalyzer.TerminalGui.WorkspaceContent, bool> publish)
     {
-        ArgumentNullException.ThrowIfNull(modifier);
+        ArgumentNullException.ThrowIfNull(owner);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(createBuilder);
+        ArgumentNullException.ThrowIfNull(publish);
 
-        var registration = new ModifierRegistration(modifier);
-        lock (CurrentGate)
-            Modifiers.Add(registration);
-
-        try
+        lock (Gate)
         {
-            RefreshCurrent();
-            return registration;
-        }
-        catch
-        {
-            registration.Remove(refresh: false);
-            throw;
+            if (!Units.TryGetValue(id, out var unit))
+                Units.Add(id, unit = new());
+            unit.Scenario = new(owner, context, createBuilder, publish);
         }
     }
 
-    public static bool ModifyCurrent(
-        Action<RamenTrainingDisplayContext, RamenTrainingDisplayEditor> modifier,
-        bool switchToWorkspace = true,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(modifier);
-
-        CurrentDisplay? current;
-        lock (CurrentGate)
-            current = currentDisplay;
-
-        return current is not null &&
-            RenderCurrent(current, modifier, switchToWorkspace, cancellationToken);
-    }
-
-    public static bool RefreshCurrent(
+    public static bool Show(
+        RamenTrainingDisplayId id,
         bool switchToWorkspace = false,
         CancellationToken cancellationToken = default)
     {
-        CurrentDisplay? current;
-        lock (CurrentGate)
-            current = currentDisplay;
+        ScenarioPart scenario;
+        Action<RamenTrainingDisplayContext, RamenTrainingDisplayEditor>[] parts;
+        lock (Gate)
+        {
+            if (!Units.TryGetValue(id, out var unit) || unit.Scenario is not { } value)
+                return false;
+            scenario = value;
+            parts = [.. unit.Parts
+                .OrderBy(entry => entry.Key.Sequence)
+                .Select(entry => entry.Value)];
+        }
 
-        return current is not null &&
-            RenderCurrent(current, modifier: null, switchToWorkspace, cancellationToken);
+        var builder = scenario.CreateBuilder(scenario.Context);
+        var editor = new RamenTrainingDisplayEditor(builder);
+        foreach (var part in parts)
+            part(scenario.Context, editor);
+        var content = RamenTrainingDisplayRenderer.Render(RamenDisplaySnapshot.Create(builder));
+        if (cancellationToken.IsCancellationRequested)
+            return false;
+        scenario.Publish(id, content, switchToWorkspace);
+        return true;
     }
 
-    internal static void SetCurrentDisplay(
-        object owner,
-        Func<
-            Action<RamenTrainingDisplayContext, RamenTrainingDisplayEditor>?,
-            bool,
-            Func<bool>,
-            bool> render)
+    internal static void Remove(object owner, RamenTrainingDisplayId id)
     {
         ArgumentNullException.ThrowIfNull(owner);
-        ArgumentNullException.ThrowIfNull(render);
+        lock (Gate)
+            if (Units.TryGetValue(id, out var unit) && ReferenceEquals(unit.Scenario?.Owner, owner))
+                Units.Remove(id);
+    }
 
-        var current = new CurrentDisplay(owner, render);
-        CurrentDisplay? previous;
-        lock (CurrentGate)
-        {
-            previous = currentDisplay;
-            currentDisplay = current;
-        }
+    internal static void Clear(object owner)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        lock (Gate)
+            foreach (var id in Units
+                         .Where(entry => ReferenceEquals(entry.Value.Scenario?.Owner, owner))
+                         .Select(entry => entry.Key)
+                         .ToArray())
+                Units.Remove(id);
+    }
 
-        try
+    internal static void UpdatePart(
+        RamenTrainingDisplayPartProducer producer,
+        RamenTrainingDisplayId id,
+        Action<RamenTrainingDisplayContext, RamenTrainingDisplayEditor> part)
+    {
+        ArgumentNullException.ThrowIfNull(part);
+        lock (Gate)
         {
-            _ = RenderCurrent(current, modifier: null, switchToWorkspace: true, CancellationToken.None);
-        }
-        catch
-        {
-            lock (CurrentGate)
-                if (ReferenceEquals(currentDisplay, current))
-                    currentDisplay = previous;
-            throw;
+            ObjectDisposedException.ThrowIf(producer.IsDisposed, producer);
+            if (!Units.TryGetValue(id, out var unit))
+                Units.Add(id, unit = new());
+            unit.Parts[producer] = part;
         }
     }
 
-    internal static void ClearCurrentDisplay(object owner)
+    internal static void RemoveProducer(RamenTrainingDisplayPartProducer producer)
     {
-        ArgumentNullException.ThrowIfNull(owner);
-
-        lock (CurrentGate)
-            if (ReferenceEquals(currentDisplay?.Owner, owner))
-                currentDisplay = null;
+        lock (Gate)
+        {
+            foreach (var (id, unit) in Units.ToArray())
+            {
+                unit.Parts.Remove(producer);
+                if (unit.Scenario is null && unit.Parts.Count == 0)
+                    Units.Remove(id);
+            }
+        }
     }
 
     internal static RamenDisplayLine CreateStyledLine(RamenDisplaySegment[] segments)
@@ -113,61 +124,40 @@ public static class RamenTrainingDisplay
         return RamenDisplayLine.Styled(segments);
     }
 
-    static bool RenderCurrent(
-        CurrentDisplay current,
-        Action<RamenTrainingDisplayContext, RamenTrainingDisplayEditor>? modifier,
-        bool switchToWorkspace,
-        CancellationToken cancellationToken)
-    {
-        ModifierRegistration[] modifiers;
-        lock (CurrentGate)
-            modifiers = [.. Modifiers];
-
-        return current.Render(
-            (context, editor) =>
-            {
-                foreach (var registration in modifiers)
-                    registration.Apply(context, editor);
-                modifier?.Invoke(context, editor);
-            },
-            switchToWorkspace,
-            () => !cancellationToken.IsCancellationRequested && IsCurrent(current));
-    }
-
-    static bool IsCurrent(CurrentDisplay candidate)
-    {
-        lock (CurrentGate)
-            return ReferenceEquals(currentDisplay, candidate);
-    }
-
-    sealed record CurrentDisplay(
+    sealed record ScenarioPart(
         object Owner,
-        Func<
-            Action<RamenTrainingDisplayContext, RamenTrainingDisplayEditor>?,
-            bool,
-            Func<bool>,
-            bool> Render);
+        RamenTrainingDisplayContext Context,
+        Func<RamenTrainingDisplayContext, RamenTrainingDisplayBuilder> CreateBuilder,
+        Action<RamenTrainingDisplayId, UmamusumeResponseAnalyzer.TerminalGui.WorkspaceContent, bool> Publish);
 
-    sealed class ModifierRegistration(
-        Action<RamenTrainingDisplayContext, RamenTrainingDisplayEditor> modifier) : IDisposable
+    sealed class DisplayUnit
     {
-        int disposed;
+        internal ScenarioPart? Scenario { get; set; }
+        internal Dictionary<RamenTrainingDisplayPartProducer, Action<RamenTrainingDisplayContext, RamenTrainingDisplayEditor>> Parts { get; } = [];
+    }
+}
 
-        internal void Apply(RamenTrainingDisplayContext context, RamenTrainingDisplayEditor editor)
-            => modifier(context, editor);
+public sealed class RamenTrainingDisplayPartProducer : IDisposable
+{
+    int disposed;
 
-        public void Dispose() => Remove(refresh: true);
+    internal RamenTrainingDisplayPartProducer(long sequence)
+    {
+        Sequence = sequence;
+    }
 
-        internal void Remove(bool refresh)
-        {
-            if (Interlocked.Exchange(ref disposed, 1) != 0)
-                return;
+    internal long Sequence { get; }
+    internal bool IsDisposed => Volatile.Read(ref disposed) != 0;
 
-            lock (CurrentGate)
-                Modifiers.Remove(this);
-            if (refresh)
-                RefreshCurrent();
-        }
+    public void Update(
+        RamenTrainingDisplayId id,
+        Action<RamenTrainingDisplayContext, RamenTrainingDisplayEditor> part)
+        => RamenTrainingDisplay.UpdatePart(this, id, part);
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref disposed, 1) == 0)
+            RamenTrainingDisplay.RemoveProducer(this);
     }
 }
 

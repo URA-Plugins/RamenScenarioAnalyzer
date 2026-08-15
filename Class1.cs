@@ -19,7 +19,12 @@ public sealed class RamenScenarioAnalyzer : IPlugin
     public void Initialize(IPluginContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        history.Initialize(context.Application);
+        history.Initialize(
+            context.Application,
+            key => RamenTrainingDisplay.Show(new(key.SingleModeCharaId, key.Turn)),
+            key => RamenTrainingDisplay.Remove(
+                this,
+                new(key.SingleModeCharaId, key.Turn)));
         context.Analyzers.Register<SingleModeRamenExecCommandResponse>(
             AnalyzerKind.Response,
             [EndpointPattern.Regex(CommonResponseEndpoints)],
@@ -35,7 +40,7 @@ public sealed class RamenScenarioAnalyzer : IPlugin
     public void Dispose()
     {
         history.Stop();
-        RamenTrainingDisplay.ClearCurrentDisplay(this);
+        RamenTrainingDisplay.Clear(this);
         lock (stateGate)
         {
             workspace?.RemovePanel(TrainingPanelKey);
@@ -85,31 +90,43 @@ public sealed class RamenScenarioAnalyzer : IPlugin
                 trainStats,
                 currentTurn);
             var target = Workspace.Create(WorkspaceTitle);
-            var historyKey = new RamenDisplayHistory.Key(
+            var displayId = new RamenTrainingDisplayId(
                 data.CharaInfo.single_mode_chara_id,
                 data.CharaInfo.turn);
-            RamenTrainingDisplay.SetCurrentDisplay(
+            var historyKey = new RamenDisplayHistory.Key(
+                displayId.SingleModeCharaId,
+                displayId.Turn);
+            RamenTrainingDisplay.Update(
                 this,
-                (modifier, switchToWorkspace, isCurrent) =>
+                displayId,
+                context,
+                displayContext =>
+                {
+                    var builder = RamenTrainingDisplayBuilder.CreateDefault(displayContext);
+                    AddTurnStateImportantRows(displayContext, builder);
+                    return builder;
+                },
+                (_, content, switchToWorkspace) =>
                 {
                     lock (stateGate)
                     {
-                        var builder = RamenTrainingDisplayBuilder.CreateDefault(context);
-                        AddTurnStateImportantRows(context, builder);
-                        modifier?.Invoke(context, new(builder));
-                        var content = RamenTrainingDisplayRenderer.Render(RamenDisplaySnapshot.Create(builder));
-                        if (!isCurrent())
-                            return false;
-                        history.Publish(
+                        history.Show(
                             target,
                             historyKey,
                             content,
-                            switchToWorkspace,
-                            () => workspace = target);
-                        return true;
+                            switchToWorkspace);
+                        workspace = target;
                     }
                 });
-            workspace = target;
+            if (history.ShouldShow(historyKey))
+            {
+                if (!RamenTrainingDisplay.Show(displayId, switchToWorkspace: true))
+                    throw new InvalidOperationException($"拉面杯 DisplayId 不存在: {displayId}。");
+            }
+            else
+            {
+                history.Track(target, historyKey);
+            }
             if (data.CharaInfo.playing_state == 1)
                 currentTurn = turn.Turn;
         }
