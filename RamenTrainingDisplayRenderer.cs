@@ -17,22 +17,37 @@ internal sealed record RamenDisplaySnapshot(
     ImmutableArray<RamenDisplayLine> ImportantRows,
     ImmutableArray<RamenPanelSnapshot> ScenarioPanels,
     ImmutableArray<RamenTrainingCardSnapshot> TrainingCards,
-    ImmutableArray<RamenDisplayLine> ExtraRows)
+    ImmutableArray<RamenExtraSectionSnapshot> ExtraSections)
 {
     public static RamenDisplaySnapshot Create(RamenTrainingDisplayBuilder builder)
     {
         var mainWidth = CommandInfoLayout.Current.MainSectionWidth;
+        var extraSections = new List<RamenExtraSectionSnapshot>();
+        if (builder.ExtraRows.Count != 0)
+            extraSections.Add(RamenExtraSectionSnapshot.Create("Ramen", builder.ExtraRows));
+        extraSections.AddRange(builder.ExtraSections
+            .Where(section => section.Rows.Count != 0)
+            .Select(RamenExtraSectionSnapshot.Create));
         return new(
             mainWidth,
             [.. builder.HeaderPanels.Select(RamenPanelSnapshot.Create)],
             [.. builder.ImportantRows.Lines.Select(Copy)],
             [.. builder.ScenarioPanels.Select(RamenPanelSnapshot.Create)],
             [.. builder.TrainingCards.Select(RamenTrainingCardSnapshot.Create)],
-            [.. builder.ExtraRows.Lines.Select(Copy)]);
+            [.. extraSections]);
     }
 
     internal static RamenDisplayLine Copy(RamenDisplayLine line)
         => new(line.Segments.ToImmutableArray(), line.IsRule);
+}
+
+internal sealed record RamenExtraSectionSnapshot(string Title, ImmutableArray<RamenDisplayLine> Rows)
+{
+    public static RamenExtraSectionSnapshot Create(RamenExtraSection section)
+        => Create(section.Title, section.Rows);
+
+    public static RamenExtraSectionSnapshot Create(string title, RamenDisplayRows rows)
+        => new(title, [.. rows.Lines.Select(RamenDisplaySnapshot.Copy)]);
 }
 
 internal sealed record RamenPanelSnapshot(
@@ -88,6 +103,7 @@ internal static class RamenTrainingDisplayRenderer
         readonly int minimumContentHeight;
         readonly View main;
         readonly FrameView extras;
+        readonly ImmutableArray<RamenDisplayLine> extraRows;
 
         public RamenDashboardView(RamenDisplaySnapshot snapshot)
         {
@@ -117,6 +133,8 @@ internal static class RamenTrainingDisplayRenderer
             var normal = GetAttributeForRole(VisualRole.Normal);
             var palette = new RamenPalette(normal);
             SetScheme(palette.BaseScheme);
+            extraRows = [.. snapshot.ExtraSections.SelectMany(section =>
+                section.Rows.Prepend(RamenDisplayLine.Colored(section.Title, RamenDisplayColor.Cyan)))];
 
             main = new View
             {
@@ -148,7 +166,7 @@ internal static class RamenTrainingDisplayRenderer
                 0,
                 minimumContentWidth - mainWidth,
                 Dim.Fill(),
-                snapshot.ExtraRows,
+                extraRows,
                 palette,
                 wordWrap: true);
             Add(main, extras);
@@ -156,10 +174,15 @@ internal static class RamenTrainingDisplayRenderer
 
         protected override void OnSubViewLayout(LayoutEventArgs args)
         {
-            var visibleWidth = Math.Max(1, Viewport.Width);
-            var visibleHeight = Math.Max(1, Viewport.Height);
-            var contentWidth = Math.Max(visibleWidth, minimumContentWidth);
-            var contentHeight = Math.Max(visibleHeight, minimumContentHeight);
+            var frameWidth = Math.Max(1, Frame.Width);
+            var frameHeight = Math.Max(1, Frame.Height);
+            var contentWidth = Math.Max(frameWidth, minimumContentWidth);
+            var visibleHeight = Math.Max(1, frameHeight - (contentWidth > frameWidth ? 1 : 0));
+            var extraTextWidth = Math.Max(1, contentWidth - mainWidth - 4);
+            var extraHeight = extraRows.Sum(row => row.Text.Length == 0
+                ? 1
+                : TextFormatter.WordWrapText(row.Text, extraTextWidth).Count()) + 2;
+            var contentHeight = Math.Max(visibleHeight, Math.Max(minimumContentHeight, extraHeight));
             var contentSize = new Size(contentWidth, contentHeight);
             if (GetContentSize() != contentSize)
                 SetContentSize(contentSize);
@@ -168,8 +191,8 @@ internal static class RamenTrainingDisplayRenderer
             extras.Width = contentWidth - mainWidth;
             extras.Height = contentHeight;
 
-            var maxX = Math.Max(0, contentWidth - visibleWidth);
-            var maxY = Math.Max(0, contentHeight - visibleHeight);
+            var maxX = Math.Max(0, contentWidth - Math.Max(1, Viewport.Width));
+            var maxY = Math.Max(0, contentHeight - Math.Max(1, Viewport.Height));
             if (Viewport.X > maxX || Viewport.Y > maxY)
             {
                 Viewport = new Rectangle(

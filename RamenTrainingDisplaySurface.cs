@@ -18,8 +18,13 @@ public static class RamenTrainingDisplay
     static readonly Dictionary<RamenTrainingDisplayId, DisplayUnit> Units = [];
     static long nextProducerSequence;
 
-    public static RamenTrainingDisplayPartProducer RegisterPartProducer()
-        => new(Interlocked.Increment(ref nextProducerSequence));
+    public static RamenTrainingDisplayPartProducer RegisterPartProducer(string sourceTitle)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceTitle);
+        if (sourceTitle.Contains('\r') || sourceTitle.Contains('\n'))
+            throw new ArgumentException("Extra 来源标题必须为单行文本。", nameof(sourceTitle));
+        return new(sourceTitle, Interlocked.Increment(ref nextProducerSequence));
+    }
 
     internal static void Update(
         object owner,
@@ -47,21 +52,24 @@ public static class RamenTrainingDisplay
         CancellationToken cancellationToken = default)
     {
         ScenarioPart scenario;
-        Action<RamenTrainingDisplayContext, RamenTrainingDisplayEditor>[] parts;
+        KeyValuePair<RamenTrainingDisplayPartProducer, Action<RamenTrainingDisplayContext, RamenTrainingDisplayEditor>>[] parts;
         lock (Gate)
         {
             if (!Units.TryGetValue(id, out var unit) || unit.Scenario is not { } value)
                 return false;
             scenario = value;
-            parts = [.. unit.Parts
-                .OrderBy(entry => entry.Key.Sequence)
-                .Select(entry => entry.Value)];
+            parts = [.. unit.Parts.OrderBy(entry => entry.Key.Sequence)];
         }
 
         var builder = scenario.CreateBuilder(scenario.Context);
-        var editor = new RamenTrainingDisplayEditor(builder);
-        foreach (var part in parts)
+        foreach (var (producer, part) in parts)
+        {
+            var rows = new RamenDisplayRows();
+            var editor = new RamenTrainingDisplayEditor(builder, rows);
             part(scenario.Context, editor);
+            if (rows.Count != 0)
+                builder.ExtraSections.Add(new(producer.SourceTitle, rows));
+        }
         var content = RamenTrainingDisplayRenderer.Render(RamenDisplaySnapshot.Create(builder));
         if (cancellationToken.IsCancellationRequested)
             return false;
@@ -141,11 +149,13 @@ public sealed class RamenTrainingDisplayPartProducer : IDisposable
 {
     int disposed;
 
-    internal RamenTrainingDisplayPartProducer(long sequence)
+    internal RamenTrainingDisplayPartProducer(string sourceTitle, long sequence)
     {
+        SourceTitle = sourceTitle;
         Sequence = sequence;
     }
 
+    internal string SourceTitle { get; }
     internal long Sequence { get; }
     internal bool IsDisposed => Volatile.Read(ref disposed) != 0;
 
@@ -164,10 +174,15 @@ public sealed class RamenTrainingDisplayPartProducer : IDisposable
 public sealed class RamenTrainingDisplayEditor
 {
     internal RamenTrainingDisplayEditor(RamenTrainingDisplayBuilder builder)
+        : this(builder, builder.ExtraRows)
+    {
+    }
+
+    internal RamenTrainingDisplayEditor(RamenTrainingDisplayBuilder builder, RamenDisplayRows extraRows)
     {
         Training = new(builder);
         Important = new(builder.ImportantRows);
-        Extra = new(builder.ExtraRows);
+        Extra = new(extraRows);
         Scenario = new(builder);
     }
 

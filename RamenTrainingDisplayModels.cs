@@ -50,6 +50,8 @@ internal sealed class RamenDisplayRows : IReadOnlyList<string>
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
+internal sealed record RamenExtraSection(string Title, RamenDisplayRows Rows);
+
 public sealed class RamenTrainingDisplayContext(
     object response,
     RamenScenarioResponseData responseData,
@@ -72,6 +74,7 @@ internal sealed class RamenTrainingDisplayBuilder
     public RamenDisplayRows ImportantRows { get; } = new();
     public List<RamenTrainingCard> TrainingCards { get; } = [];
     public RamenDisplayRows ExtraRows { get; } = new();
+    public List<RamenExtraSection> ExtraSections { get; } = [];
 
     public RamenTrainingCard? FindTrainingCardByCommandId(int commandId)
         => TrainingCards.FirstOrDefault(x => x.CommandId == commandId);
