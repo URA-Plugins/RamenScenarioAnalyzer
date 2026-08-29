@@ -1,0 +1,11 @@
+<Project>
+  <ItemGroup Condition="'$(IsUraPlugin)' == 'true' and '$(DirectoryBuildTargetsPath)' == '' and Exists('$(UraHostProjectPath)')">
+    <ProjectReference Include="$(UraHostProjectPath)" ReferenceOutputAssembly="true" Private="false" />
+  </ItemGroup>
+
+  <Target Name="ValidateStandaloneUraHostProjectPath"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(IsUraPlugin)' == 'true' and '$(DirectoryBuildTargetsPath)' == '' and !Exists('$(UraHostProjectPath)')">
+    <Error Text="Standalone URA plugin build requires UraHostProjectPath to name an existing UmamusumeResponseAnalyzer.csproj; received '$(UraHostProjectPath)'." />
+  </Target>
+</Project>

@@ -15,7 +15,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="RamenScenarioAnalyzerPatchDslSmoke" />
+    <InternalsVisibleTo Include="RamenScenarioAnalyzerSmoke" />
+    <Compile Remove="tests\**\*.cs" />
   </ItemGroup>
 
 </Project>
