@@ -25,7 +25,7 @@ The default display follows the same general layout as `BreedersScenarioAnalyzer
 The repository pins the Host source with a Git submodule. From the repository root after cloning:
 
 ```powershell
-git submodule update --init --recursive
+git -c core.longpaths=true submodule update --init --recursive
 dotnet build .\RamenScenarioAnalyzer.csproj -c Release -m:1 -p:RuntimeIdentifier=win-x64 -p:SelfContained=false -p:PlatformTarget=AnyCPU -p:DeployUraPluginToLocalAppDataOnBuild=false
 dotnet run --project .\tests\RamenScenarioAnalyzerPatchDslSmoke\RamenScenarioAnalyzerPatchDslSmoke.csproj -c Release -m:1 -p:GenerateUraPluginManifestOnBuild=false -p:PackageUraPluginOnBuild=false -p:DeployUraPluginToLocalAppDataOnBuild=false
 ```
