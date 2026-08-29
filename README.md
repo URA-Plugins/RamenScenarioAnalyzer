@@ -22,13 +22,12 @@ The default display follows the same general layout as `BreedersScenarioAnalyzer
 
 ## Build and smoke test
 
-A standalone checkout needs the canonical Host source project. Set its path, then use the repository-owned Host reference target:
+The repository pins the Host source with a Git submodule. From the repository root after cloning:
 
 ```powershell
-$hostProject = (Resolve-Path 'X:\path\to\UmamusumeResponseAnalyzer\UmamusumeResponseAnalyzer\UmamusumeResponseAnalyzer.csproj').Path
-$standaloneTargets = (Resolve-Path '.\build\StandaloneHostReference.targets').Path
-dotnet build .\RamenScenarioAnalyzer.slnx -c Release -m:1 -p:UraHostProjectPath="$hostProject" -p:CustomAfterMicrosoftCommonTargets="$standaloneTargets" -p:GenerateUraPluginManifestOnBuild=false -p:PackageUraPluginOnBuild=false -p:DeployUraPluginToLocalAppDataOnBuild=false
-dotnet run --project .\tests\RamenScenarioAnalyzerSmoke\RamenScenarioAnalyzerSmoke.csproj -c Release -m:1 -p:UraHostProjectPath="$hostProject" -p:CustomAfterMicrosoftCommonTargets="$standaloneTargets"
+git -c core.longpaths=true submodule update --init --recursive
+dotnet build .\RamenScenarioAnalyzer.slnx -c Release -m:1 -p:GenerateUraPluginManifestOnBuild=false -p:PackageUraPluginOnBuild=false -p:DeployUraPluginToLocalAppDataOnBuild=false
+dotnet run --project .\tests\RamenScenarioAnalyzerSmoke\RamenScenarioAnalyzerSmoke.csproj -c Release -m:1 -p:GenerateUraPluginManifestOnBuild=false -p:PackageUraPluginOnBuild=false -p:DeployUraPluginToLocalAppDataOnBuild=false
 ```
 
 The smoke executable runs 20 phases covering display composition, Terminal.Gui layout and colors, scrolling and resizing, training-partner semantics, analyzer registration and dispatch, workspace lifecycle, producer composition, and keyed history input.
