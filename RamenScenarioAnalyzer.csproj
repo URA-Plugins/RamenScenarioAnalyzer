@@ -19,4 +19,8 @@
     <Compile Remove="tests\**\*.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="UmamusumeResponseAnalyzer" Version="2026.9.1" />
+  </ItemGroup>
+
 </Project>
