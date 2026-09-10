@@ -28,4 +28,8 @@ The repository references the Host API through NuGet. From the repository root a
 dotnet build .\RamenScenarioAnalyzer.csproj -c Release -m:1 -p:GenerateUraPluginManifestOnBuild=false -p:PackageUraPluginOnBuild=false -p:DeployUraPluginToLocalAppDataOnBuild=false
 ```
 
-The Host-dependent smoke executable is maintained at `URA-Plugins.Integration/tests/RamenScenarioAnalyzerSmoke` and runs 20 phases covering display composition, Terminal.Gui layout and colors, scrolling and resizing, training-partner semantics, analyzer registration and dispatch, workspace lifecycle, producer composition, and keyed history input.
+The Host-dependent smoke executable is maintained at `tests/RamenScenarioAnalyzerSmoke` and runs 20 phases covering display composition, Terminal.Gui layout and colors, scrolling and resizing, training-partner semantics, analyzer registration and dispatch, workspace lifecycle, producer composition, and keyed history input.
+
+## 验证与发布
+
+在 Windows 仓库根执行 `act workflow_dispatch --artifact-server-path "$env:TEMP/ura-act-artifacts"`。本地与 GitHub 使用同一份 workflow；版本 tag 触发 GitHub Release 发布。环境要求、共用 workflow 本地映射和发布规则见 [URA plugin workflows](https://github.com/URA-Plugins/.github/blob/v1/README.md)。
