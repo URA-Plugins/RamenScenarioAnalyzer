@@ -966,6 +966,7 @@ static RamenTrainingDisplayContext CreateDisplayContext(
         response,
         response.data.chara_info,
         response.data.ramen_data_set,
+        null, 
         response.data.home_info,
         response.data.unchecked_event_array,
         commandResult: null);

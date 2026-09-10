@@ -8,6 +8,7 @@ public sealed class RamenScenarioResponseData(
     object response,
     SingleModeChara charaInfo,
     SingleModeRamenDataSet dataSet,
+    SingleModeRamenDataSetLoad? dataSetLoad,
     SingleModeHomeInfo? homeInfo,
     SingleModeEventInfo[]? uncheckedEventArray,
     SingleModeCommandResult? commandResult)
@@ -18,6 +19,7 @@ public sealed class RamenScenarioResponseData(
     public SingleModeHomeInfo? HomeInfo { get; } = homeInfo;
     public SingleModeEventInfo[]? UncheckedEventArray { get; } = uncheckedEventArray;
     public SingleModeCommandResult? CommandResult { get; } = commandResult;
+    public SingleModeRamenDataSetLoad? DataSetLoad { get; } = dataSetLoad;
 }
 
 public sealed class RamenCommandInfo

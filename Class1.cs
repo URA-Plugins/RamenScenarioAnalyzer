@@ -9,7 +9,7 @@ public sealed class RamenScenarioAnalyzer : IPlugin
     const string WorkspaceTitle = "RamenScenarioAnalyzer";
     const string TrainingPanelKey = "training";
     const string CommonResponseEndpoints =
-        "^/umamusume/single_mode_ramen/(?:change_short_cut|check_event|check_point|continue|exec_command|finish_claw_crane|gain_skills|race_end|race_entry|race_out|ramen_live|select_region|tasting|uraf_effect_apply)$";
+        "^/umamusume/single_mode_ramen/(?:change_short_cut|check_event|check_point|continue|exec_command|finish_claw_crane|gain_skills|race_end|race_entry|race_out|ramen_live|uraf_effect_apply|tasting|select_region)$";
 
     readonly object stateGate = new();
     readonly RamenDisplayHistory history = new(WorkspaceTitle, TrainingPanelKey, "拉面杯训练");
@@ -33,8 +33,37 @@ public sealed class RamenScenarioAnalyzer : IPlugin
         context.Analyzers.Register<SingleModeRamenLoadResponse>(
             AnalyzerKind.Response,
             [EndpointPattern.Exact("/umamusume/single_mode_ramen/load")],
-            invocation => Analyze(invocation.Payload),
+            invocation => Analyze(invocation.Payload),  // 同名但是不同类型重载，实现不同
             priority: 1);
+        context.Analyzers.Register<SingleModeRamenTastingResponse>(
+            AnalyzerKind.Response,
+            [EndpointPattern.Exact("/umamusume/single_mode_ramen/tasting")],
+            invocation => AnalyzeTasting(invocation.Payload),
+            priority: 0);
+        context.Analyzers.Register<SingleModeRamenSelectRegionRequest>(
+            AnalyzerKind.Request,
+            [EndpointPattern.Exact("/umamusume/single_mode_ramen/select_region")],
+            invocation => AnalyzeRegionSelect(invocation.Payload),
+            priority: 0);
+    }
+
+    static ValueTask AnalyzeTasting(SingleModeRamenTastingResponse response)
+    {
+        var data = response.data;
+        
+        RamenScenarioState.UpdateTasting(
+            data.chara_info.single_mode_chara_id,
+            data.last_tasting_info,
+            data.check_point_pt,
+            data.expected_check_point_pt);
+        return ValueTask.CompletedTask;
+    }
+
+    static ValueTask AnalyzeRegionSelect(SingleModeRamenSelectRegionRequest request)
+    {
+
+        RamenScenarioState.UpdateRegionSelect(request.region_id_array);
+        return ValueTask.CompletedTask;
     }
 
     public void Dispose()
@@ -60,6 +89,7 @@ public sealed class RamenScenarioAnalyzer : IPlugin
             response,
             loadCommon.chara_info,
             response.data.ramen_data_set,
+            response.data.ramen_data_set_load,
             loadCommon.home_info,
             loadCommon.unchecked_event_array,
             commandResult: null));
@@ -70,6 +100,7 @@ public sealed class RamenScenarioAnalyzer : IPlugin
             response,
             response.data.chara_info,
             response.data.ramen_data_set,
+            null,
             response.data.home_info,
             response.data.unchecked_event_array,
             response.data.command_result));
@@ -96,6 +127,12 @@ public sealed class RamenScenarioAnalyzer : IPlugin
             var historyKey = new RamenDisplayHistory.Key(
                 displayId.SingleModeCharaId,
                 displayId.Turn);
+            // 更新RamenState
+            if (data.DataSetLoad != null)
+            {
+                RamenScenarioState.UpdateLoad(data.CharaInfo.single_mode_chara_id, data.DataSetLoad);
+            }
+
             RamenTrainingDisplay.Update(
                 this,
                 displayId,
