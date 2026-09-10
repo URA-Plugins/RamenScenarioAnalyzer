@@ -19,4 +19,8 @@
     <Compile Remove="tests\**\*.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="UmamusumeResponseAnalyzer" Version="*" PrivateAssets="all" />
+  </ItemGroup>
+
 </Project>

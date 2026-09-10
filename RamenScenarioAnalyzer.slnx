@@ -1,4 +1,3 @@
 <Solution>
   <Project Path="RamenScenarioAnalyzer.csproj" />
-  <Project Path="tests/RamenScenarioAnalyzerSmoke/RamenScenarioAnalyzerSmoke.csproj" />
 </Solution>

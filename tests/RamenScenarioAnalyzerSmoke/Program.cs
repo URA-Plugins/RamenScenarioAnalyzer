@@ -556,7 +556,7 @@ static void TestModifierSurface()
 
 static void TestProjectMetadataAndDependency()
 {
-    var projectPath = Path.Combine(FindRepositoryRoot(), "RamenScenarioAnalyzer.csproj");
+    var projectPath = FindPluginProject();
     var project = XDocument.Load(projectPath);
     RequireEqual("true", project.Descendants("IsUraPlugin").Single().Value, "IsUraPlugin");
     RequireSequence(
@@ -566,12 +566,18 @@ static void TestProjectMetadataAndDependency()
     if (project.Descendants("PluginDependencies").Any())
         throw new InvalidOperationException("RamenScenarioAnalyzer must not declare EventLoggerPlugin.");
 
+    var hostReference = project.Descendants("PackageReference").SingleOrDefault(x =>
+        x.Attribute("Include")?.Value == "UmamusumeResponseAnalyzer" &&
+        x.Attribute("Version")?.Value == "*");
+    if (hostReference is null)
+        throw new InvalidOperationException("RamenScenarioAnalyzer must reference UmamusumeResponseAnalyzer *.");
+
     var references = project.Descendants("ProjectReference")
         .Select(x => x.Attribute("Include")?.Value)
         .Where(x => x is not null)
         .ToArray();
     if (references.Any(x => x!.Contains("UmamusumeResponseAnalyzer", StringComparison.OrdinalIgnoreCase)))
-        throw new InvalidOperationException("RamenScenarioAnalyzer must use the repository build wiring for its host reference.");
+        throw new InvalidOperationException("RamenScenarioAnalyzer must not reference the Host project.");
 }
 
 static void TestAnalyzerRegistrations(IApplication application)
@@ -1447,23 +1453,10 @@ static CellToken FindCellToken(DashboardCapture capture, string token)
 static string RenderRows(IEnumerable<string> rows)
     => string.Join(Environment.NewLine, rows);
 
-static string FindRepositoryRoot()
-{
-    foreach (var startPath in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
-    {
-        for (var directory = new DirectoryInfo(startPath);
-             directory is not null;
-             directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "RamenScenarioAnalyzer.csproj")))
-            {
-                return directory.FullName;
-            }
-        }
-    }
-
-    throw new InvalidOperationException("Could not locate the RamenScenarioAnalyzer repository root.");
-}
+static string FindPluginProject()
+    => Path.Combine(Environment.GetEnvironmentVariable("URA_TEST_PLUGIN_ROOT")
+        ?? throw new InvalidOperationException("URA_TEST_PLUGIN_ROOT must identify the plugin checkout."),
+        "RamenScenarioAnalyzer.csproj");
 
 static T Require<T>(T? value, string name)
     where T : class

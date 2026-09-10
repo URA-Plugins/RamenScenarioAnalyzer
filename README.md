@@ -20,14 +20,16 @@ The default display follows the same general layout as `BreedersScenarioAnalyzer
 
 `RegisterPartProducer(sourceTitle)` requires a non-empty single-line title. `producer.Update(new RamenTrainingDisplayId(charaId, turn), part)` replaces only that producer's part for the specified display ID and does not touch the View. `RamenTrainingDisplay.Show(id)` combines that ID's scenario base part and producer parts, then publishes once; it returns `false` when the scenario part is not available or cancellation was requested. A non-empty analyzer Extra starts with the cyan `Ramen` title, followed by each non-empty producer Extra under its cyan title in registration order; sections are contiguous with no inner border, indentation, or blank separator. Same-producer updates are last-write-wins, different IDs are isolated, and registration, Update, and Dispose never publish implicitly. The public Important, Extra, training-card, and scenario-panel editors accept plain text or colored `RamenDisplaySegment` values. A failing part leaves the last successful display unchanged.
 
-## Build and smoke test
+## Build
 
-The repository pins the Host source with a Git submodule. From the repository root after cloning:
+The repository references the Host API through NuGet. From the repository root after cloning:
 
 ```powershell
-git -c core.longpaths=true submodule update --init --recursive
-dotnet build .\RamenScenarioAnalyzer.slnx -c Release -m:1 -p:GenerateUraPluginManifestOnBuild=false -p:PackageUraPluginOnBuild=false -p:DeployUraPluginToLocalAppDataOnBuild=false
-dotnet run --project .\tests\RamenScenarioAnalyzerSmoke\RamenScenarioAnalyzerSmoke.csproj -c Release -m:1 -p:GenerateUraPluginManifestOnBuild=false -p:PackageUraPluginOnBuild=false -p:DeployUraPluginToLocalAppDataOnBuild=false
+dotnet build .\RamenScenarioAnalyzer.csproj -c Release -m:1 -p:GenerateUraPluginManifestOnBuild=false -p:PackageUraPluginOnBuild=false -p:DeployUraPluginToLocalAppDataOnBuild=false
 ```
 
-The smoke executable runs 20 phases covering display composition, Terminal.Gui layout and colors, scrolling and resizing, training-partner semantics, analyzer registration and dispatch, workspace lifecycle, producer composition, and keyed history input.
+The Host-dependent smoke executable is maintained at `tests/RamenScenarioAnalyzerSmoke` and runs 20 phases covering display composition, Terminal.Gui layout and colors, scrolling and resizing, training-partner semantics, analyzer registration and dispatch, workspace lifecycle, producer composition, and keyed history input.
+
+## 验证与发布
+
+在 Windows 仓库根执行 `act workflow_dispatch --artifact-server-path "$env:TEMP/ura-act-artifacts"`。本地与 GitHub 使用同一份 workflow；版本 tag 触发 GitHub Release 发布。环境要求、共用 workflow 本地映射和发布规则见 [URA plugin workflows](https://github.com/URA-Plugins/.github/blob/v1/README.md)。
