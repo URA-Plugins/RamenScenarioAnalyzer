@@ -124,6 +124,15 @@ internal sealed class RamenTrainingDisplayBuilder
                 ? "URAF: -"
                 : $"URAF: type {context.DataSet.uraf_effect_info.uraf_effect_type}, state {context.DataSet.uraf_effect_info.uraf_effect_state}"));
 
+        // 剧本状态信息检查：缺少 Load 或与当前 charaId 不一致时提示用户重进育成。
+        var stateSnap = RamenScenarioState.Snapshot();
+        if (!stateSnap.loaded || stateSnap.single_mode_chara_id != data.CharaInfo.single_mode_chara_id)
+        {
+            builder.ImportantRows.Add(RamenDisplayLine.Colored(
+                "缺少剧本状态信息，需要从游戏主页重新进入育成",
+                RamenDisplayColor.Red));
+        }
+
         if (data.CommandResult is not null)
             builder.ExtraRows.Add($"上次命令: {data.CommandResult.command_id}, result={data.CommandResult.result_state}");
         var homeInfo = data.HomeInfo ?? throw new InvalidOperationException("Ramen 训练显示需要 home_info。");

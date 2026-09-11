@@ -8,6 +8,7 @@ public sealed class RamenScenarioResponseData(
     object response,
     SingleModeChara charaInfo,
     SingleModeRamenDataSet dataSet,
+    SingleModeRamenDataSetLoad? dataSetLoad,
     SingleModeHomeInfo? homeInfo,
     SingleModeEventInfo[]? uncheckedEventArray,
     SingleModeCommandResult? commandResult)
@@ -18,6 +19,7 @@ public sealed class RamenScenarioResponseData(
     public SingleModeHomeInfo? HomeInfo { get; } = homeInfo;
     public SingleModeEventInfo[]? UncheckedEventArray { get; } = uncheckedEventArray;
     public SingleModeCommandResult? CommandResult { get; } = commandResult;
+    public SingleModeRamenDataSetLoad? DataSetLoad { get; } = dataSetLoad;
 }
 
 public sealed class RamenCommandInfo
@@ -70,10 +72,13 @@ public sealed class TrainingPartner
         int position,
         SingleModeCommandInfo command)
     {
+        // 防御式查询：数据缺失（空卡位/名字库未收录该卡或马娘）时回退为空，避免抛对象找不到异常中断整块训练面板渲染
         var supportCardId = position is >= 1 and <= 6
-            ? response.CharaInfo.support_card_array.First(x => x.position == position).support_card_id
-            : (int?)null;
-        var supportCard = supportCardId is { } id ? Database.Names.GetRequiredSupportCard(id) : null;
+            ? response.CharaInfo.support_card_array.FirstOrDefault(x => x.position == position)?.support_card_id
+            : null;
+        var supportCard = supportCardId is { } id && Database.Names.TryGetSupportCard(id, out var card)
+            ? card
+            : null;
         var rawName = Database.Names.DisplayNickname(supportCardId ?? position);
         var friendship = response.CharaInfo.evaluation_info_array.FirstOrDefault(x => x.target_id == position)?.evaluation ?? 0;
         var trainingType = TurnInfoRamen.ToTrainId.TryGetValue(command.command_id, out var baseCommandId)
