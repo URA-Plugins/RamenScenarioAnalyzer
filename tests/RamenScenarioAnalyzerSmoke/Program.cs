@@ -28,8 +28,10 @@ using RamenPlugin = RamenScenarioAnalyzer.RamenScenarioAnalyzer;
 
 Environment.SetEnvironmentVariable("DisableRealDriverIO", "1");
 var previousUiCulture = Thread.CurrentThread.CurrentUICulture;
+var previousCulture = Thread.CurrentThread.CurrentCulture;
 var phaseOrdinal = 0;
 Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfo("zh-CN");
+Thread.CurrentThread.CurrentCulture = CultureInfo.GetCultureInfo("zh-CN");
 try
 {
     RunPhase(nameof(TestTrainingRowsAreScrollable), TestTrainingRowsAreScrollable);
@@ -58,6 +60,7 @@ try
 finally
 {
     Thread.CurrentThread.CurrentUICulture = previousUiCulture;
+    Thread.CurrentThread.CurrentCulture = previousCulture;
 }
 
 void RunPhase(string name, Action action)
