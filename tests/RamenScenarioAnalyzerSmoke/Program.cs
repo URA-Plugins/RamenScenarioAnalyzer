@@ -28,8 +28,10 @@ using RamenPlugin = RamenScenarioAnalyzer.RamenScenarioAnalyzer;
 
 Environment.SetEnvironmentVariable("DisableRealDriverIO", "1");
 var previousUiCulture = Thread.CurrentThread.CurrentUICulture;
+var previousCulture = Thread.CurrentThread.CurrentCulture;
 var phaseOrdinal = 0;
 Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfo("zh-CN");
+Thread.CurrentThread.CurrentCulture = CultureInfo.GetCultureInfo("zh-CN");
 try
 {
     RunPhase(nameof(TestTrainingRowsAreScrollable), TestTrainingRowsAreScrollable);
@@ -48,7 +50,7 @@ try
     RunPhase(nameof(TestModifierSurface), TestModifierSurface);
     RunPhase(nameof(TestProjectMetadataAndDependency), TestProjectMetadataAndDependency);
     using var ui = new WorkspaceSmokeSession();
-    RunPhase(nameof(TestAnalyzerRegistrations), () => TestAnalyzerRegistrations(ui.Application));
+    await RunPhaseAsync(nameof(TestAnalyzerRegistrations), () => TestAnalyzerRegistrations(ui.Application));
     await RunPhaseAsync(nameof(TestStateCacheLifecycle), () => TestStateCacheLifecycle(ui));
     await RunPhaseAsync(nameof(TestWorkspaceAndFullBleed), () => TestWorkspaceAndFullBleed(ui));
     await RunPhaseAsync(nameof(TestRegisteredModifierLifecycle), () => TestRegisteredModifierLifecycle(ui));
@@ -58,6 +60,7 @@ try
 finally
 {
     Thread.CurrentThread.CurrentUICulture = previousUiCulture;
+    Thread.CurrentThread.CurrentCulture = previousCulture;
 }
 
 void RunPhase(string name, Action action)
@@ -583,7 +586,7 @@ static void TestProjectMetadataAndDependency()
         throw new InvalidOperationException("RamenScenarioAnalyzer must not reference the Host project.");
 }
 
-static void TestAnalyzerRegistrations(IApplication application)
+static async ValueTask TestAnalyzerRegistrations(IApplication application)
 {
     var plugin = new RamenPlugin();
     var context = new RecordingPluginContext(application);
@@ -620,7 +623,7 @@ static void TestAnalyzerRegistrations(IApplication application)
     RequireSequence(region.Patterns,
         [EndpointPattern.Exact("/umamusume/single_mode_ramen/select_region")], "Ramen region request pattern");
 
-    plugin.Dispose();
+    await plugin.DisposeAsync();
 }
 
 static async ValueTask TestStateCacheLifecycle(WorkspaceSmokeSession ui)
@@ -693,7 +696,7 @@ static async ValueTask TestStateCacheLifecycle(WorkspaceSmokeSession ui)
     }
     finally
     {
-        plugin.Dispose();
+        await plugin.DisposeAsync();
     }
 
     var cleared = RamenScenarioState.Snapshot();
@@ -755,7 +758,7 @@ static async ValueTask TestWorkspaceAndFullBleed(WorkspaceSmokeSession ui)
     }
     finally
     {
-        plugin.Dispose();
+        await plugin.DisposeAsync();
     }
 
     var published = target ?? throw new InvalidOperationException("Ramen did not create its Workspace.");
@@ -853,7 +856,7 @@ static async ValueTask TestRegisteredModifierLifecycle(WorkspaceSmokeSession ui)
     {
         second?.Dispose();
         first?.Dispose();
-        plugin.Dispose();
+        await plugin.DisposeAsync();
     }
 }
 
@@ -875,7 +878,7 @@ static async ValueTask TestLoadAnalyzerRendersTrainingPanel(WorkspaceSmokeSessio
     }
     finally
     {
-        plugin.Dispose();
+        await plugin.DisposeAsync();
     }
 
     target.SwitchTo();
@@ -991,7 +994,7 @@ static async ValueTask TestKeyedHistoryAndInput(WorkspaceSmokeSession ui)
     }
     finally
     {
-        plugin.Dispose();
+        await plugin.DisposeAsync();
     }
 
     File.WriteAllText(settingsPath, "{\"historyLimit\":0}");
@@ -1007,7 +1010,7 @@ static async ValueTask TestKeyedHistoryAndInput(WorkspaceSmokeSession ui)
     }
     finally
     {
-        disabled.Dispose();
+        await disabled.DisposeAsync();
     }
 }
 
@@ -1749,22 +1752,14 @@ static class TrainIndex
 sealed class RecordingPluginContext(IApplication application) : IPluginContext
 {
     public IApplication Application => application;
-    public IPluginHostEvents Events { get; } = new ThrowingPluginHostEvents();
     public RecordingPluginAnalyzerRegistry AnalyzerRegistry { get; } = new();
     public IPluginAnalyzerRegistry Analyzers => AnalyzerRegistry;
     public bool IsPluginAvailable(string internalName) => false;
 
-    public void RunBackground(Func<CancellationToken, ValueTask> operation)
-        => throw new NotSupportedException("Ramen smoke does not use background operations.");
+    public void ReportBackgroundFailure(Exception error) => throw new InvalidOperationException("Unexpected plugin background failure.", error);
 
     public ValueTask DispatchAsync<TPayload>(Type endpointType, TPayload payload)
         => AnalyzerRegistry.DispatchAsync(endpointType, payload);
-}
-
-sealed class ThrowingPluginHostEvents : IPluginHostEvents
-{
-    public void OnStarted(Func<CancellationToken, ValueTask> handler)
-        => throw new NotSupportedException("Ramen smoke does not use host events.");
 }
 
 sealed record AnalyzerRegistration(

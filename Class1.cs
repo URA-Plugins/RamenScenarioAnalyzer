@@ -66,7 +66,7 @@ public sealed class RamenScenarioAnalyzer : IPlugin
         return ValueTask.CompletedTask;
     }
 
-    public void Dispose()
+    public ValueTask DisposeAsync()
     {
         history.Stop();
         RamenTrainingDisplay.Clear(this);
@@ -76,6 +76,7 @@ public sealed class RamenScenarioAnalyzer : IPlugin
             workspace?.RemovePanel(TrainingPanelKey);
             workspace = null;
         }
+        return ValueTask.CompletedTask;
     }
 
     public Task ConfigPromptAsync(
