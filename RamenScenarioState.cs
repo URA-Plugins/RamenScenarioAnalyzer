@@ -3,15 +3,11 @@ using Gallop;
 namespace RamenScenarioAnalyzer;
 
 /// <summary>
-/// 拉面杯剧本状态门面。单进程全局唯一快照，写读都通过 <see cref="Gate"/> 同步。
-/// 消费方（如 SendGameStatusPlugin）通过 <see cref="RamenScenarioState.Snapshot"/> 读取不可变副本。
-///
-/// 生命周期：<see cref="UpdateLoad"/> 把 <see cref="RamenStateSnapshot.loaded"/> 置 true；
-/// <see cref="Clear"/> 把所有字段复位为初始值；
-/// 插件 <c>Dispose</c> 时调用 <see cref="Clear"/>。
-/// 带角色标识的部分更新切换育成时先清空旧状态，只有 Load 能将 loaded 置 true。
-/// 消费方读 snapshot 时若 <see cref="RamenStateSnapshot.single_mode_chara_id"/>
-/// 与当前响应的 charaId 不一致，说明是新的一局，应忽略旧 snapshot 并自行重置。
+/// 拉面杯剧本状态门面：单进程全局唯一，读写经 <see cref="Gate"/> 同步，
+/// 消费方通过 <see cref="Snapshot"/> 读取不可变副本。
+/// 只有 Load 能把 loaded 置 true，插件 Dispose 时调用 <see cref="Clear"/>；
+/// 带角色标识的部分更新跨育成时先清空旧状态。消费方发现 snapshot 的 charaId
+/// 与当前响应不一致时，说明是新的一局，应忽略旧 snapshot。
 /// </summary>
 public static class RamenScenarioState
 {
@@ -24,15 +20,15 @@ public static class RamenScenarioState
     static int last_ramen;
     static int check_point_pt;
     static int expected_check_point_pt;
+    // select_region 请求写入后、被带 charaId 的更新确认前为 true；
+    // 跨育成复位时据此保留请求写入的值。
+    static bool region_select_pending;
 
     /// <summary>
-    /// 由 Load 响应写入 Load 路径独有的状态。
+    /// 由 Load 响应写入全部状态（唯一携带完整数据的路径）。
     /// </summary>
-    /// <param name="charaId">
-    /// 当前 Load 对应的 <c>single_mode_chara_id</c>，
-    /// 用于消费方判断是否仍处于同一局。
-    /// </param>
-    /// <param name="data">Load 响应中的 <c>ramen_data_set_load</c>。</param>
+    /// <param name="charaId">当前局的 <c>single_mode_chara_id</c>。</param>
+    /// <param name="data">响应中的 <c>ramen_data_set_load</c>。</param>
     public static void UpdateLoad(int charaId, SingleModeRamenDataSetLoad data)
     {
         if (data is null)
@@ -52,7 +48,7 @@ public static class RamenScenarioState
                         reduce_base_turn[idx] = info.reduce_base_turn;
                 }
 
-            // last_tasting_info == null 表示玩家尚未吃过拉面，last_ramen = -1 表示"未吃过"。
+            // last_tasting_info == null 表示未吃过，last_ramen 记为 -1。
             last_ramen = data.last_tasting_info is null
                 ? -1
                 : data.last_tasting_info.region_id;
@@ -61,6 +57,7 @@ public static class RamenScenarioState
             expected_check_point_pt = data.expected_check_point_pt;
 
             loaded = true;
+            region_select_pending = false;
         }
     }
 
@@ -78,18 +75,17 @@ public static class RamenScenarioState
                 Clear();
             single_mode_chara_id = charaId;
             selected_region_id_array = data.selected_region_id_array ?? new int[3];
+            region_select_pending = false;
         }
     }
 
     /// <summary>
-    /// 由品尝（<c>/umamusume/single_mode_ramen/tasting</c>）响应写入
-    /// <c>last_ramen</c>、<c>check_point_pt</c>、<c>expected_check_point_pt</c>，
-    /// 并以 <paramref name="charaId"/> 刷新当前角色标识。
+    /// 由品尝响应写入 <c>last_ramen</c>、<c>check_point_pt</c>、<c>expected_check_point_pt</c>
+    /// 并刷新角色标识。角色标识不一致时先复位旧状态，但 pending 的地区选择请求
+    /// 已写入的 <c>selected_region_id_array</c> 与 <c>reduce_base_turn</c> 予以保留。
     /// </summary>
     /// <param name="charaId"><c>chara_info.single_mode_chara_id</c>。</param>
-    /// <param name="lastTastingInfo">响应中的 <c>last_tasting_info</c>；为 null 时 <c>last_ramen</c> 记为 -1（"未吃过"）。</param>
-    /// <param name="checkPointPt">响应中的 <c>check_point_pt</c>。</param>
-    /// <param name="expectedCheckPointPt">响应中的 <c>expected_check_point_pt</c>。</param>
+    /// <param name="lastTastingInfo">为 null 时 <c>last_ramen</c> 记为 -1（未吃过）。</param>
     public static void UpdateTasting(
         int charaId,
         SingleModeRamenLastTastingInfo lastTastingInfo,
@@ -99,7 +95,22 @@ public static class RamenScenarioState
         lock (Gate)
         {
             if (single_mode_chara_id != charaId)
-                Clear();
+            {
+                if (region_select_pending)
+                {
+                    // 请求写入的值属于当前这局：仅复位其余状态。
+                    var selectedRegions = selected_region_id_array;
+                    var reduceBaseTurn = reduce_base_turn;
+                    Clear();
+                    selected_region_id_array = selectedRegions;
+                    reduce_base_turn = reduceBaseTurn;
+                }
+                else
+                {
+                    Clear();
+                }
+            }
+            region_select_pending = false;
             single_mode_chara_id = charaId;
             last_ramen = lastTastingInfo is null
                 ? -1
@@ -110,11 +121,11 @@ public static class RamenScenarioState
     }
 
     /// <summary>
-    /// 由地区选择请求（<c>/umamusume/single_mode_ramen/select_region</c>）写入
-    /// <c>selected_region_id_array</c>。请求本身不携带 charaId，复用门内现有的
-    /// <see cref="single_mode_chara_id"/>；该字段会在 Load 后被赋值并被本路径覆盖。
+    /// 由地区选择请求写入 <c>selected_region_id_array</c>，并把 <c>check_point_pt</c>
+    /// 复位为 0（新一轮检查点累积，<c>expected_check_point_pt</c> 不变）。
+    /// 请求不携带 charaId，写入标记为 pending，跨育成品尝复位时保留写入值。
     /// </summary>
-    /// <param name="regionIdArray">请求体中的 <c>region_id_array</c>，为 null 时跳过写入。</param>
+    /// <param name="regionIdArray">请求体中的 <c>region_id_array</c>，为 null 时跳过。</param>
     public static void UpdateRegionSelect(int[] regionIdArray)
     {
         if (regionIdArray is null)
@@ -123,6 +134,8 @@ public static class RamenScenarioState
         lock (Gate)
         {
             selected_region_id_array = (int[])regionIdArray.Clone();
+            check_point_pt = 0;
+            region_select_pending = true;
         }
     }
 
@@ -158,13 +171,13 @@ public static class RamenScenarioState
             last_ramen = 0;
             check_point_pt = 0;
             expected_check_point_pt = 0;
+            region_select_pending = false;
         }
     }
 }
 
 /// <summary>
-/// 不可变快照。消费方通过 <see cref="RamenScenarioState.Snapshot"/> 获取。
-/// 内部数组已 Clone，消费方修改不会反向影响门面。
+/// 不可变快照，内部数组已 Clone；经 <see cref="RamenScenarioState.Snapshot"/> 获取。
 /// </summary>
 public sealed class RamenStateSnapshot
 {
