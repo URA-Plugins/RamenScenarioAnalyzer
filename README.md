@@ -35,3 +35,16 @@ The Host-dependent smoke executable is maintained at `tests/RamenScenarioAnalyze
 ## 验证与发布
 
 在 Windows 仓库根执行 `act workflow_dispatch --artifact-server-path "$env:TEMP/ura-act-artifacts"`。本地与 GitHub 使用同一份 workflow；版本 tag 触发 GitHub Release 发布。环境要求、共用 workflow 本地映射和发布规则见 [URA plugin workflows](https://github.com/URA-Plugins/.github/blob/v1/README.md)。
+
+## 本仓测试
+
+`tests/RamenScenarioAnalyzerSmoke` 默认运行本插件的生命周期、历史配置和显示检查，并检查发布边界。测试工具由本仓 `tests/Support` 持有。
+
+```powershell
+$env:URA_TEST_PLUGIN_ROOT = (Get-Location).Path
+dotnet run --project tests/RamenScenarioAnalyzerSmoke -p:UraTestHostRoot=<Host源码绝对路径> -p:GenerateUraPluginManifestOnBuild=false -p:PackageUraPluginOnBuild=false -p:DeployUraPluginToLocalAppDataOnBuild=false
+```
+
+默认测试入口还执行本插件 fresh ZIP 的加载、业务与清理。先将本轮 Release/win-x64 ZIP 放入目录，并设置绝对路径 `URA_PLUGIN_SMOKE_PACKAGE_ROOT`；GitHub Actions 使用该变量或本工作区 `artifacts`。不会读取安装目录中的插件包。
+
+`tests/RamenScenarioAnalyzerReplay` 默认运行 HTTP 解析与三语言错误识别自测；`-- --corpus <绝对语料目录>` 回放该目录，仅执行 Ramen 插件并报告分发、配对、可见错误和清理结果。错误判定限于当前 framebuffer 中可见的 Error，不扫描其他工作区或屏幕外日志。没有语料时不声明真实回放通过。
