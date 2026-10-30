@@ -15,11 +15,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="RamenScenarioAnalyzerSmoke" />
-    <Compile Remove="tests\**\*.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="UmamusumeResponseAnalyzer" Version="*" PrivateAssets="all" />
   </ItemGroup>
 
