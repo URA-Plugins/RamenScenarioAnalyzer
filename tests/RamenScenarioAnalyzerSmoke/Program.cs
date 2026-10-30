@@ -26,6 +26,8 @@ using UraConfig = UmamusumeResponseAnalyzer.Config;
 using UraDatabase = UmamusumeResponseAnalyzer.Database;
 using RamenPlugin = RamenScenarioAnalyzer.RamenScenarioAnalyzer;
 
+RepositoryChecks.Run();
+
 Environment.SetEnvironmentVariable("DisableRealDriverIO", "1");
 var previousUiCulture = Thread.CurrentThread.CurrentUICulture;
 var previousCulture = Thread.CurrentThread.CurrentCulture;
@@ -50,12 +52,15 @@ try
     RunPhase(nameof(TestModifierSurface), TestModifierSurface);
     RunPhase(nameof(TestProjectMetadataAndDependency), TestProjectMetadataAndDependency);
     using var ui = new WorkspaceSmokeSession();
+    ScenarioMigrationSmoke.Run(ui);
     await RunPhaseAsync(nameof(TestAnalyzerRegistrations), () => TestAnalyzerRegistrations(ui.Application));
     await RunPhaseAsync(nameof(TestStateCacheLifecycle), () => TestStateCacheLifecycle(ui));
     await RunPhaseAsync(nameof(TestWorkspaceAndFullBleed), () => TestWorkspaceAndFullBleed(ui));
     await RunPhaseAsync(nameof(TestRegisteredModifierLifecycle), () => TestRegisteredModifierLifecycle(ui));
     await RunPhaseAsync(nameof(TestKeyedHistoryAndInput), () => TestKeyedHistoryAndInput(ui));
     await RunPhaseAsync(nameof(TestLoadAnalyzerRendersTrainingPanel), () => TestLoadAnalyzerRendersTrainingPanel(ui));
+    PackageSmoke.Run(ui);
+    ui.InvokeOnOwner(() => { HistoryConfigSmoke.Run(ui.Application); return true; });
 }
 finally
 {
