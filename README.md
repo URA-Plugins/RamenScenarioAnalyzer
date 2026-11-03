@@ -6,7 +6,7 @@ The analyzer has no runtime dependency on `EventLoggerPlugin`. Other plugins can
 
 `RamenScenarioState.Snapshot()` exposes the current training's cached state. Load populates it even when pending events prevent the training panel from rendering. `loaded` means a Load was received for `single_mode_chara_id`; partial updates for another training clear previous fields and stay unloaded until Load. Plugin disposal clears the cache.
 
-Successful training displays are retained in process memory by `(single_mode_chara_id, turn)`. Reprocessing the same key replaces that record in place. Use ↑/↓ for the previous/next record and ←/→ for the oldest/newest record while the Ramen panel has focus; use PageUp/PageDown, Home/End, or the mouse wheel to scroll its content.
+Successful training displays are retained in process memory by `(single_mode_chara_id, turn)`. Reprocessing the same key replaces that record in place. Use ↑/↓ for the previous/next record and ←/→ for the oldest/newest record while the Ramen panel has focus. The vertical mouse wheel navigates history over the current workspace body or blank space. A historical selection starts as a preview and returns to the newest record when a new record arrives. Left-click confirms the selection; right-click or → returns to the newest record. Moving to another historical record starts a new preview. Navigation updates one notification and refreshes its duration. Use PageUp/PageDown, Home/End, and scrollbars to scroll content; horizontal wheel scrolling is retained.
 
 The per-plugin setting is stored only after Save in `PluginData/RamenScenarioAnalyzer/settings.json`:
 

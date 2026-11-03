@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Resources;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Terminal.Gui.App;
@@ -17,6 +18,7 @@ internal sealed class RamenDisplayHistory(
 {
     const int DefaultHistoryLimit = 100;
     const int MaximumHistoryLimit = 1000;
+    const string HistoryNotificationKey = "history";
 
     static readonly JsonSerializerOptions SettingsJson = new()
     {
@@ -24,6 +26,9 @@ internal sealed class RamenDisplayHistory(
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         WriteIndented = true,
     };
+
+    static readonly ResourceManager HistoryText = new(
+        "RamenScenarioAnalyzer.i18n.History", typeof(RamenDisplayHistory).Assembly);
 
     readonly object gate = new();
     readonly List<Entry> entries = [];
@@ -38,6 +43,7 @@ internal sealed class RamenDisplayHistory(
     int selectedIndex = -1;
     bool active;
     bool hasUnread;
+    bool confirmed;
     bool panelAdmitted;
 
     internal readonly record struct Key(int SingleModeCharaId, int Turn);
@@ -56,6 +62,8 @@ internal sealed class RamenDisplayHistory(
             application = targetApplication;
             showUnit = show;
             evictUnit = evict;
+            if (workspace is not null)
+                workspace.MouseEvent -= WorkspaceMouseEvent;
             workspace = null;
             view = null;
             entries.Clear();
@@ -64,6 +72,7 @@ internal sealed class RamenDisplayHistory(
             historyLimit = settings.HistoryLimit;
             selectedIndex = -1;
             hasUnread = false;
+            confirmed = false;
             panelAdmitted = false;
             active = true;
         }
@@ -88,7 +97,7 @@ internal sealed class RamenDisplayHistory(
             if (retainedIndex >= 0)
                 return false;
 
-            return selectedIndex == entries.Count - 1 ||
+            return !confirmed || selectedIndex == entries.Count - 1 ||
                 entries.Count >= historyLimit && selectedIndex == 0;
         }
     }
@@ -119,12 +128,22 @@ internal sealed class RamenDisplayHistory(
         Action<Key>? evict;
         bool admitPanel;
         bool notifyUnread;
+        var notifyNewest = false;
+        Key? trackedSelection = null;
+        Func<Key, bool>? show;
+        string? positionNotification = null;
         lock (gate)
         {
             if (!active)
                 return;
 
-            workspace = target;
+            if (!ReferenceEquals(workspace, target))
+            {
+                if (workspace is not null)
+                    workspace.MouseEvent -= WorkspaceMouseEvent;
+                workspace = target;
+                workspace.MouseEvent += WorkspaceMouseEvent;
+            }
             var previouslyVisible = visibleKey;
             if (historyLimit == 0)
             {
@@ -133,6 +152,7 @@ internal sealed class RamenDisplayHistory(
                 entries.Clear();
                 selectedIndex = -1;
                 hasUnread = false;
+                confirmed = false;
                 notifyUnread = false;
             }
             else
@@ -159,6 +179,8 @@ internal sealed class RamenDisplayHistory(
                     selectedIndex = entries.FindIndex(entry => entry.HistoryKey == key);
                     if (selectedIndex < 0)
                         throw new InvalidOperationException($"{workspaceTitle} 无法保留 DisplayId: {key}。");
+                    if (selectedKey != key || selectedIndex == entries.Count - 1)
+                        confirmed = false;
                     if (selectedIndex == entries.Count - 1)
                         hasUnread = false;
                     notifyUnread = false;
@@ -172,11 +194,13 @@ internal sealed class RamenDisplayHistory(
                     {
                         selectedIndex = entries.Count - 1;
                         hasUnread = false;
+                        confirmed = false;
                     }
-                    else if (!wasBrowsingOlder || selectedKey is null)
+                    else if (!wasBrowsingOlder || selectedKey is null || inserted && !confirmed)
                     {
                         selectedIndex = entries.Count - 1;
                         hasUnread = false;
+                        confirmed = false;
                     }
                     else
                     {
@@ -188,7 +212,10 @@ internal sealed class RamenDisplayHistory(
                     }
 
                     notifyUnread = inserted && wasBrowsingOlder && !previouslyUnread && hasUnread;
+                    if (selectedIndex >= 0 && entries[selectedIndex].HistoryKey != visibleKey)
+                        trackedSelection = entries[selectedIndex].HistoryKey;
                 }
+                notifyNewest = inserted && wasBrowsingOlder && selectedIndex == entries.Count - 1;
             }
 
             if (commit)
@@ -200,6 +227,9 @@ internal sealed class RamenDisplayHistory(
             if (admitPanel)
                 panelAdmitted = true;
             evict = evictUnit;
+            show = showUnit;
+            if (notifyNewest)
+                positionNotification = PositionNotificationLocked();
         }
 
         foreach (var evictedKey in evicted.Distinct())
@@ -237,8 +267,12 @@ internal sealed class RamenDisplayHistory(
             }
         }
 
+        if (trackedSelection is { } targetKey && (show is null || !show(targetKey)))
+            throw new InvalidOperationException($"{workspaceTitle} 无法显示选中的 DisplayId: {targetKey}。");
         if (notifyUnread)
-            target.Notify("有新的训练历史。按 → 查看最新。");
+            target.Notify(HistoryNotificationKey, HistoryText.GetString("HistoryUnread")!);
+        else if (positionNotification is not null)
+            target.Notify(HistoryNotificationKey, positionNotification);
     }
 
     public void Stop()
@@ -252,9 +286,12 @@ internal sealed class RamenDisplayHistory(
             visibleKey = null;
             selectedIndex = -1;
             hasUnread = false;
+            confirmed = false;
             panelAdmitted = false;
             currentView = view;
             view = null;
+            if (workspace is not null)
+                workspace.MouseEvent -= WorkspaceMouseEvent;
             workspace = null;
             showUnit = null;
             evictUnit = null;
@@ -326,11 +363,14 @@ internal sealed class RamenDisplayHistory(
         Key? showKey = null;
         Func<Key, bool>? show;
         Action<Key>? evict;
+        Workspace? target;
+        string? notification = null;
         lock (gate)
         {
             Key? selectedKey = selectedIndex >= 0 && selectedIndex < entries.Count
                 ? entries[selectedIndex].HistoryKey
                 : null;
+            var wasBrowsingOlder = selectedIndex >= 0 && selectedIndex < entries.Count - 1;
             historyLimit = value;
             if (value == 0)
             {
@@ -340,6 +380,7 @@ internal sealed class RamenDisplayHistory(
                 entries.Clear();
                 selectedIndex = -1;
                 hasUnread = false;
+                confirmed = false;
             }
             else
             {
@@ -356,16 +397,21 @@ internal sealed class RamenDisplayHistory(
                 {
                     selectedIndex = entries.Count - 1;
                     hasUnread = false;
+                    confirmed = false;
                 }
                 else if (selectedIndex == entries.Count - 1)
                 {
                     hasUnread = false;
+                    confirmed = false;
                 }
                 if (selectedIndex >= 0 && entries[selectedIndex].HistoryKey != visibleKey)
                     showKey = entries[selectedIndex].HistoryKey;
+                if (wasBrowsingOlder && selectedIndex == entries.Count - 1)
+                    notification = PositionNotificationLocked();
             }
             show = showUnit;
             evict = evictUnit;
+            target = workspace;
         }
 
         foreach (var key in evicted.Distinct())
@@ -373,6 +419,8 @@ internal sealed class RamenDisplayHistory(
                 evict?.Invoke(key);
         if (showKey is { } targetKey && (show is null || !show(targetKey)))
             throw new InvalidOperationException($"{workspaceTitle} 无法显示保留的 DisplayId: {targetKey}。");
+        if (notification is not null)
+            target?.Notify(HistoryNotificationKey, notification);
     }
 
     bool TryNavigate(Navigation navigation)
@@ -380,39 +428,77 @@ internal sealed class RamenDisplayHistory(
         Key? key = null;
         Func<Key, bool>? show;
         Workspace? target;
-        string? notification = null;
+        string notification;
         lock (gate)
         {
-            if (!active || historyLimit == 0)
+            if (!active || historyLimit == 0 || entries.Count == 0)
+                return false;
+            if (navigation == Navigation.Confirm && (confirmed || selectedIndex == entries.Count - 1))
                 return false;
             target = workspace;
-            if (entries.Count != 0)
+            var previousIndex = selectedIndex;
+            selectedIndex = navigation switch
             {
-                if (selectedIndex < 0 || selectedIndex >= entries.Count)
-                    selectedIndex = entries.Count - 1;
-                var previousIndex = selectedIndex;
-                selectedIndex = navigation switch
-                {
-                    Navigation.Older => Math.Max(0, selectedIndex - 1),
-                    Navigation.Newer => Math.Min(entries.Count - 1, selectedIndex + 1),
-                    Navigation.Oldest => 0,
-                    Navigation.Newest => entries.Count - 1,
-                    _ => selectedIndex,
-                };
-                if (selectedIndex == entries.Count - 1)
-                    hasUnread = false;
-                if (selectedIndex != previousIndex)
-                    key = entries[selectedIndex].HistoryKey;
-                notification = $"训练历史 {selectedIndex + 1}/{entries.Count}";
-            }
+                Navigation.Older => Math.Max(0, selectedIndex - 1),
+                Navigation.Newer => Math.Min(entries.Count - 1, selectedIndex + 1),
+                Navigation.Oldest => 0,
+                Navigation.Newest => entries.Count - 1,
+                _ => selectedIndex,
+            };
+            if (navigation == Navigation.Confirm)
+                confirmed = true;
+            else if (selectedIndex != previousIndex || navigation == Navigation.Newest)
+                confirmed = false;
+            if (selectedIndex == entries.Count - 1)
+                hasUnread = false;
+            if (selectedIndex != previousIndex)
+                key = entries[selectedIndex].HistoryKey;
+            notification = PositionNotificationLocked();
             show = showUnit;
         }
 
         if (key is { } targetKey && (show is null || !show(targetKey)))
             throw new InvalidOperationException($"{workspaceTitle} 无法显示选中的 DisplayId: {targetKey}。");
-        if (notification is not null)
-            target?.Notify(notification);
+        target?.Notify(HistoryNotificationKey, notification);
         return true;
+    }
+
+    string PositionNotificationLocked()
+    {
+        var resource = selectedIndex == entries.Count - 1
+            ? "HistoryNewest"
+            : confirmed ? "HistoryConfirmed" : "HistoryPreview";
+        return string.Format(CultureInfo.CurrentCulture,
+            HistoryText.GetString(resource)!, selectedIndex + 1, entries.Count);
+    }
+
+    void WorkspaceMouseEvent(object? sender, Mouse mouse)
+    {
+        var flags = mouse.Flags;
+        if (mouse.Handled || (flags & (MouseFlags.Ctrl | MouseFlags.Alt | MouseFlags.Shift)) != 0)
+            return;
+        for (var target = mouse.View; target is not null; target = target.SuperView)
+            if (target is ScrollBar)
+                return;
+
+        Navigation? navigation = flags switch
+        {
+            MouseFlags.WheeledUp => Navigation.Older,
+            MouseFlags.WheeledDown => Navigation.Newer,
+            MouseFlags.LeftButtonClicked => Navigation.Confirm,
+            MouseFlags.RightButtonClicked => Navigation.Newest,
+            _ => null,
+        };
+        if (navigation is not { } requested)
+            return;
+        lock (gate)
+        {
+            if (!active || historyLimit == 0 || entries.Count == 0 ||
+                requested == Navigation.Confirm && (confirmed || selectedIndex == entries.Count - 1))
+                return;
+            mouse.Handled = true;
+        }
+        TryNavigate(requested);
     }
 
     void RefreshView(WorkspaceContent? snapshot)
@@ -765,5 +851,6 @@ internal sealed class RamenDisplayHistory(
         Newer,
         Oldest,
         Newest,
+        Confirm,
     }
 }

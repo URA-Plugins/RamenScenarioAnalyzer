@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="HistoryPreview" xml:space="preserve">
+    <value>训练历史 {0}/{1} · 预览</value>
+  </data>
+  <data name="HistoryConfirmed" xml:space="preserve">
+    <value>训练历史 {0}/{1} · 已确认</value>
+  </data>
+  <data name="HistoryNewest" xml:space="preserve">
+    <value>训练历史 {0}/{1} · 最新</value>
+  </data>
+  <data name="HistoryUnread" xml:space="preserve">
+    <value>有新的训练历史。右键或按 → 查看最新。</value>
+  </data>
+</root>
